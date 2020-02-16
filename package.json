@@ -5,7 +5,7 @@
   "main": "src/server.ts",
   "license": "Apache-2.0",
   "scripts": {
-    "serve": "node dist/server.js",
+    "serve": "node dist/app.js",
     "build": "npm run build:ts",
     "build:ts": "tsc",
     "dev": "npm run build:ts && npm run serve",
@@ -16,9 +16,11 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.2",
+    "@types/validator": "^12.0.1",
     "@typescript-eslint/eslint-plugin": "^2.19.2",
     "@typescript-eslint/parser": "^2.19.2",
     "concurrently": "^5.1.0",
+    "dotenv": "^8.2.0",
     "eslint": "^6.8.0",
     "jest": "^25.1.0",
     "nodemon": "^2.0.2",
@@ -26,6 +28,8 @@
   },
   "dependencies": {
     "express": "^4.17.1",
-    "http-status-codes": "^1.4.0"
+    "firebase-admin": "^8.9.2",
+    "http-status-codes": "^1.4.0",
+    "validator": "^12.2.0"
   }
 }

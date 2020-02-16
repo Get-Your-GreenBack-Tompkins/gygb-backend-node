@@ -43,3 +43,6 @@ node_modules/
 
 # Build / generate output
 dist
+
+# Things that definitely shouldn't be in git.
+secrets
