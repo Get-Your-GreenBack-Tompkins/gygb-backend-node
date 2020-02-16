@@ -3,16 +3,16 @@ import * as express from "express";
 import { ApiError } from "../api/util";
 
 export const apiErrors: express.ErrorRequestHandler = (err, _, res, next) => {
-  if (err instanceof ApiError) {
-    res.status(err.status).send({ message: err.message });
-  } else {
-    console.log(
-      err instanceof Error
-        ? "Unhandled error occured!"
-        : "Unexpected error value found:"
-    );
+  let apiError = err;
 
-    console.error(err);
-    next(err);
+  // Handle unexpected errors.
+  if (!(err instanceof ApiError)) {
+    apiError = ApiError.internalError("Internal server error!", err);
   }
+
+  if (apiError.error) {
+    console.error(apiError.error);
+  }
+
+  res.status(err.status).send({ message: err.message });
 };
