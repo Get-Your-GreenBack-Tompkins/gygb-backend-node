@@ -1,3 +1,5 @@
+import "./env";
+
 import { GreenBackDB } from "./db";
 
 import serve from "./server";
