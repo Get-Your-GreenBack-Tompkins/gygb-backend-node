@@ -2,7 +2,7 @@
   "name": "gygb-backend-node",
   "version": "0.0.1",
   "description": "Backend for Get Your GreenBack Tompkins services.f",
-  "main": "src/server.ts",
+  "main": "src/app.ts",
   "license": "Apache-2.0",
   "scripts": {
     "serve": "node dist/app.js",
@@ -12,7 +12,7 @@
     "dev:test": "npm run test -- --watchAll",
     "test": "jest --forceExit --coverage --verbose",
     "lint": "tsc --noEmit && eslint \"src/**/*.ts\" --quiet --fix",
-    "debug": "node --inspect dist/server.js"
+    "debug": "node --inspect dist/app.js"
   },
   "devDependencies": {
     "@types/express": "^4.17.2",
