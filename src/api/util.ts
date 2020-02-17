@@ -28,12 +28,3 @@ export class ApiError extends Error {
     return new ApiError(message, Status.BAD_REQUEST);
   }
 }
-
-// This type represents all valid json.
-export type json =
-  | string
-  | number
-  | boolean
-  | null
-  | json[]
-  | { [key in string | number]: json };
