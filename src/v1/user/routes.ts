@@ -1,6 +1,8 @@
 import * as express from "express";
 import * as Status from "http-status-codes";
 
+import isEmail from "validator/lib/isEmail";
+
 import { asyncify } from "../../middleware/async";
 
 import { V1DB } from "../db";
@@ -73,6 +75,12 @@ export default function defineRoutes(db: V1DB): express.Router {
       }
 
       const { marketing, email, source } = body;
+
+      if (!isEmail(email)) {
+        return res
+          .status(Status.BAD_REQUEST)
+          .send({ message: "Invalid Email" });
+      }
 
       const user = await userdb.getUser(body.email);
 
