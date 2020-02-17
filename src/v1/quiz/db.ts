@@ -11,6 +11,42 @@ export class QuizDB {
     this.db = db;
   }
 
+  async getQuestion(
+    id: string,
+    questionId: string,
+    loadAnswers = true
+  ): Promise<Question> {
+    const quizDoc = await this.db.quiz().doc(id);
+
+    const questionDoc = quizDoc.collection("questions").doc(questionId);
+    const questionData = await questionDoc.get();
+
+    let answers = [];
+
+    if (loadAnswers) {
+      const answerData = await questionDoc.collection("answers").get();
+
+      answers.push(
+        ...answerData.docs
+          .filter((d): d is FirebaseFirestore.QueryDocumentSnapshot<
+            AnswerDoc
+          > => isAnswerDocument(d))
+          .map(d => Answer.fromDatastore(d.id, d.data()))
+      );
+    }
+
+    if (!isQuestionDocument(questionData)) {
+      throw new Error("Invalid question in quiz!");
+    }
+
+    const question = Question.fromDatastore(
+      questionData.id,
+      questionData.data()
+    )(answers);
+
+    return question;
+  }
+
   async getQuiz(id: string): Promise<Quiz> {
     const quizDoc = await this.db.quiz().doc(id);
 

@@ -60,9 +60,10 @@ export class Question extends Model {
   }
 
   toJSON() {
-    const { body, header, answers } = this;
+    const { id, body, header, answers } = this;
 
     return {
+      id,
       body,
       header,
       answers
