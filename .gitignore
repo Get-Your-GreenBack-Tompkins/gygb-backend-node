@@ -46,3 +46,5 @@ dist
 
 # Things that definitely shouldn't be in git.
 secrets
+
+.DS_Store

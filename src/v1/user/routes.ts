@@ -50,7 +50,9 @@ export default function defineRoutes(db: V1DB): express.Router {
     "/emails/marketing",
     asyncify(async (_, res) => {
       const users = await userdb.getEmailList();
-
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Content-Length, X-Requested-With, Accept");
       res.status(Status.OK).send({ emailList: users.map(u => u.email) });
     })
   );
@@ -78,7 +80,7 @@ export default function defineRoutes(db: V1DB): express.Router {
     "/",
     asyncify(async (req, res) => {
       const { body } = req;
-
+      console.log(body);
       if (!hasEmail(body) || !hasMarketing(body) || !hasSource(body)) {
         return res.status(Status.BAD_REQUEST).send({ message: "Bad Request" });
       }
