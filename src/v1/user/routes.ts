@@ -47,6 +47,15 @@ export default function defineRoutes(db: V1DB): express.Router {
   const userdb = new UserDB(db);
 
   router.get(
+    "/emails/marketing",
+    asyncify(async (_, res) => {
+      const users = await userdb.getEmailList();
+
+      res.status(Status.OK).send({ emailList: users.map(u => u.email) });
+    })
+  );
+
+  router.get(
     "/",
     asyncify(async (req, res) => {
       const { query } = req;

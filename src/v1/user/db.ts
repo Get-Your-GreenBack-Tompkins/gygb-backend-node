@@ -24,6 +24,21 @@ export class UserDB {
     return User.fromDatastore(userDoc.id, userDoc.data());
   }
 
+  async getEmailList(): Promise<User[]> {
+    const users = await this.db
+      .users()
+      .where("marketingConsent", "==", true)
+      .get();
+
+    const marketingUsers = users.docs
+      .filter((d): d is FirebaseFirestore.QueryDocumentSnapshot<UserDoc> =>
+        isUserQueryDocument(d)
+      )
+      .map(d => User.fromDatastore(d.id, d.data()));
+
+    return marketingUsers;
+  }
+
   async updateUser(user: User) {
     throw new Error("User updates not yet implemented!");
   }
