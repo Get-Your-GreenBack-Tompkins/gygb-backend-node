@@ -9,6 +9,7 @@ export default function serve(db: GreenBackDB) {
   const app = express();
 
   app.use(apiErrors);
+  app.use(express.json());
 
   app.use("/v1/", v1(db));
 
