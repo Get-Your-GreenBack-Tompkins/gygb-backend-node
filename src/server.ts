@@ -11,13 +11,14 @@ export default function serve(db: GreenBackDB) {
   app.use(apiErrors);
   app.use(express.json());
 
-  app.use("/v1/", v1(db));
 
   app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Content-Length, X-Requested-With, Accept");
+    next();
   });
+  app.use("/v1/", v1(db));
 
   let server = app.listen(process.env.PORT || 5150, () => {
     const addr = server.address();
