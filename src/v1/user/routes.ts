@@ -78,6 +78,7 @@ export default function defineRoutes(db: V1DB): express.Router {
     "/",
     asyncify(async (req, res) => {
       const { body } = req;
+
       if (!hasEmail(body) || !hasMarketing(body) || !hasSource(body)) {
         return res.status(Status.BAD_REQUEST).send({ message: "Bad Request" });
       }
