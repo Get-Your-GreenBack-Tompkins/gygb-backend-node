@@ -50,9 +50,6 @@ export default function defineRoutes(db: V1DB): express.Router {
     "/emails/marketing",
     asyncify(async (_, res) => {
       const users = await userdb.getEmailList();
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Content-Length, X-Requested-With, Accept");
       res.status(Status.OK).send({ emailList: users.map(u => u.email) });
     })
   );
