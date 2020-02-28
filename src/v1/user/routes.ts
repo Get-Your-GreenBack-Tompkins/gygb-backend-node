@@ -3,6 +3,8 @@ import * as Status from "http-status-codes";
 
 import isEmail from "validator/lib/isEmail";
 
+import { Redis } from "ioredis";
+
 import { asyncify } from "../../middleware/async";
 
 import { V1DB } from "../db";
@@ -41,7 +43,7 @@ function hasSource(x: unknown): x is { source: UserSource } {
   );
 }
 
-export default function defineRoutes(db: V1DB): express.Router {
+export default function defineRoutes(db: V1DB, _?: Redis): express.Router {
   const router = express.Router();
 
   const userdb = new UserDB(db);

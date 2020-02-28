@@ -4,8 +4,19 @@ import { RichText, RichTextData, isRichTextData } from "./richtext";
 
 export type AnswerId = string;
 export type AnswerDoc = {
+  id: number;
   text: RichTextData;
+  correct: boolean;
 };
+
+export function isAnswer(data: unknown) {
+  if (typeof data !== "object") {
+    return false;
+  }
+
+  const asAns = data as AnswerDoc;
+  return isRichTextData(asAns.text);
+}
 
 export function isAnswerDocument(
   doc: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.DocumentData>
@@ -15,28 +26,34 @@ export function isAnswerDocument(
   return data.text && isRichTextData(data.text);
 }
 
-export class Answer extends Model {
-  id: AnswerId;
+export class Answer {
+
+  id: number;
   text: RichText;
+  correct: boolean;
 
   toJSON() {
-    const { id, text } = this;
+    const { id, text, correct } = this;
     return {
       id,
-      text
+      text,
+      correct
     };
   }
 
-  static fromDatastore(id: string, doc: AnswerDoc): Answer {
+  static fromDatastore(doc: AnswerDoc, index: number): Answer {
     const answer = new Answer();
-    answer.id = id;
+    answer.id = index;
     answer.text = RichText.fromDatastore(doc.text);
+    answer.correct = doc.correct;
     return answer;
   }
 
   toDatastore(): AnswerDoc {
     return {
-      text: this.text.toDatastore()
+      id: this.id,
+      text: this.text.toDatastore(),
+      correct: this.correct
     };
   }
 }
