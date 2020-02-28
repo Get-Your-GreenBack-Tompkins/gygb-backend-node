@@ -15,6 +15,16 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
 
   const quizdb = new QuizDB(db);
 
+  // router.post(
+  //   "/:quizId/question/:questionId/edit",
+  //   asyncify(async (req, res) => {
+  //     const { quizId, questionId } = req.params;
+
+  //     const question = await quizdb.getQuestion(quizId, questionId);
+
+  //   })
+  // );
+
   router.get(
     "/:id",
     cache(r => (r.params.id ? `quizById(${r.params.id})` : `quizById`), redis),
@@ -46,7 +56,7 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
       const question = await quizdb.getQuestion(quizId, questionId, false);
 
       if (question) {
-        const correct = question.correctAnswer === answerId;
+        const correct = question.answers[parseInt(answerId)].correct;
 
         // TODO Allow the message to be dynamic.
 

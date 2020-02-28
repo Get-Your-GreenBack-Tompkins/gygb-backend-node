@@ -1,13 +1,14 @@
 import { Model } from "../../model";
 
 import { RichText, RichTextData, isRichTextData } from "./richtext";
-import { Answer, AnswerId } from "./answer";
+import { Answer, AnswerDoc, AnswerId, isAnswer } from "./answer";
 
 export type QuestionId = string;
 export type QuestionDoc = {
-  correctAnswer: string;
   body: RichTextData;
+  id: QuestionId;
   header: RichTextData;
+  answers: AnswerDoc[];
 };
 
 export function isQuestionDocument(
@@ -18,8 +19,9 @@ export function isQuestionDocument(
 
   const hasBody = data.body && isRichTextData(data.body);
   const hasHeader = data.header && isRichTextData(data.header);
+  const hasAnswers = data.answers && data.answers.every(answer => isAnswer(answer));
 
-  return hasBody && hasHeader;
+  return hasBody && hasHeader && hasAnswers;
 }
 
 export class Question extends Model {
@@ -28,13 +30,13 @@ export class Question extends Model {
   header: RichText;
 
   answers: Answer[];
-  correctAnswer: AnswerId;
 
   toDatastore(): QuestionDoc {
     return {
-      correctAnswer: `${this.correctAnswer}`,
       body: this.body.toDatastore(),
-      header: this.header.toDatastore()
+      id: this.id,
+      header: this.header.toDatastore(),
+      answers: this.answers.map(answer => answer.toDatastore())
     };
   }
 
@@ -43,20 +45,19 @@ export class Question extends Model {
   }
 
   static fromDatastore(
-    id: string,
+    id: QuestionId,
     data: QuestionDoc
-  ): (answers: Answer[]) => Question {
-    return (answers: Answer[]) => {
-      const q = new Question();
+  ): Question {
 
-      q.id = id;
-      q.answers = answers;
-      q.body = RichText.fromDatastore(data.body);
-      q.header = RichText.fromDatastore(data.header);
-      q.correctAnswer = data.correctAnswer;
+    const q = new Question();
 
-      return q;
-    };
+    q.id = id;
+    q.answers = data.answers.map((answer, i) => Answer.fromDatastore(answer, i));
+    q.body = RichText.fromDatastore(data.body);
+    q.header = RichText.fromDatastore(data.header);
+
+    return q;
+
   }
 
   toJSON() {
