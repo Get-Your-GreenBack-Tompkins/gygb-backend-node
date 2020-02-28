@@ -11,29 +11,11 @@ export class QuizDB {
     this.db = db;
   }
 
-  async getQuestion(
-    id: string,
-    questionId: string,
-    loadAnswers = true
-  ): Promise<Question> {
+  async getQuestion(id: string, questionId: string): Promise<Question> {
     const quizDoc = await this.db.quiz().doc(id);
 
     const questionDoc = quizDoc.collection("questions").doc(questionId);
     const questionData = await questionDoc.get();
-
-    const answers = [];
-
-    if (loadAnswers) {
-      const answerData = await questionDoc.collection("answers").get();
-
-      answers.push(
-        ...answerData.docs
-          .filter((d): d is FirebaseFirestore.QueryDocumentSnapshot<
-            AnswerDoc
-          > => isAnswerDocument(d))
-          .map((d, i) => Answer.fromDatastore(d.data(), i))
-      );
-    }
 
     if (!isQuestionDocument(questionData)) {
       throw new Error("Invalid question in quiz!");
@@ -45,6 +27,17 @@ export class QuizDB {
     );
 
     return question;
+  }
+
+  async updateQuestion(quizId: string, question: Question): Promise<number> {
+    const quizDoc = await this.db.quiz().doc(quizId);
+
+    const result = await quizDoc
+      .collection("questions")
+      .doc(question.id)
+      .set(question.toDatastore());
+
+    return result.writeTime.nanoseconds;
   }
 
   async getQuiz(id: string): Promise<Quiz> {

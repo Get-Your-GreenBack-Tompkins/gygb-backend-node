@@ -21,12 +21,13 @@ export function isRichTextData(data: unknown) {
   );
 }
 
-export class RichText { // This isn't technically a "model" (it isn't a document)
+export class RichText {
+  // This isn't technically a "model" (it isn't a document)
   private delta: string;
   private rendered: string;
   private sanitized: string;
 
-  fromJSON(delta: string) {
+  static fromJSON(delta: string): RichText {
     const rt = new RichText();
     rt.delta = delta;
 
@@ -38,10 +39,12 @@ export class RichText { // This isn't technically a "model" (it isn't a document
       }
     };
 
-    // render the text.
-    const converter = new QuillDeltaToHtmlConverter(JSON.parse(delta), {});
-    const unsanitizedHtml = converter.convert();
+    // Parse the delta string.
+    const parsedDelta = JSON.parse(delta);
 
+    // TODO Confirm ops exists.
+    const converter = new QuillDeltaToHtmlConverter(parsedDelta.ops, {});
+    const unsanitizedHtml = converter.convert();
     const sanitizedHtml = sanitize(unsanitizedHtml, opts);
 
     rt.rendered = unsanitizedHtml;

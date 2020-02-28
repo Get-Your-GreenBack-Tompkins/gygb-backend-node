@@ -1,7 +1,13 @@
 import { Model } from "../../model";
 
 import { RichText, RichTextData, isRichTextData } from "./richtext";
-import { Answer, AnswerDoc, AnswerId, isAnswer } from "./answer";
+import {
+  Answer,
+  AnswerDoc,
+  isAnswer,
+  AnswerEdit,
+  isAnswerEdit
+} from "./answer";
 
 export type QuestionId = string;
 export type QuestionDoc = {
@@ -9,6 +15,12 @@ export type QuestionDoc = {
   id: QuestionId;
   header: RichTextData;
   answers: AnswerDoc[];
+};
+
+export type QuestionEdit = {
+  body: string;
+  header: string;
+  answers: AnswerEdit[];
 };
 
 export function isQuestionDocument(
@@ -19,9 +31,19 @@ export function isQuestionDocument(
 
   const hasBody = data.body && isRichTextData(data.body);
   const hasHeader = data.header && isRichTextData(data.header);
-  const hasAnswers = data.answers && data.answers.every(answer => isAnswer(answer));
+  const hasAnswers =
+    data.answers && data.answers.every(answer => isAnswer(answer));
 
   return hasBody && hasHeader && hasAnswers;
+}
+
+export function isQuestionEdit(data: unknown): data is QuestionEdit {
+  const asEdit = data as QuestionEdit;
+  return (
+    typeof asEdit.body === "string" &&
+    typeof asEdit.header === "string" &&
+    asEdit.answers.every(answer => isAnswerEdit(answer))
+  );
 }
 
 export class Question extends Model {
@@ -44,20 +66,28 @@ export class Question extends Model {
     return this.answers;
   }
 
-  static fromDatastore(
-    id: QuestionId,
-    data: QuestionDoc
-  ): Question {
-
+  static fromDatastore(id: QuestionId, data: QuestionDoc): Question {
     const q = new Question();
 
     q.id = id;
-    q.answers = data.answers.map((answer, i) => Answer.fromDatastore(answer, i));
+    q.answers = data.answers.map((answer, i) =>
+      Answer.fromDatastore(answer, i)
+    );
     q.body = RichText.fromDatastore(data.body);
     q.header = RichText.fromDatastore(data.header);
 
     return q;
+  }
 
+  static fromJSON(id: QuestionId, data: QuestionEdit): Question {
+    const q = new Question();
+
+    q.id = id;
+    q.answers = data.answers.map(answer => Answer.fromJSON(answer));
+    q.body = RichText.fromJSON(data.body);
+    q.header = RichText.fromJSON(data.header);
+
+    return q;
   }
 
   toJSON() {
