@@ -11,9 +11,10 @@ import {
 
 export type QuestionId = string;
 export type QuestionDoc = {
+  order?: number;
   body: RichTextData;
-  id: QuestionId;
   header: RichTextData;
+  answerId: number;
   answers: AnswerDoc[];
 };
 
@@ -33,6 +34,7 @@ export function isQuestionDocument(
   const hasHeader = data.header && isRichTextData(data.header);
   const hasAnswers =
     data.answers && data.answers.every(answer => isAnswer(answer));
+  const hasAnswerId = data.answerId && typeof data.answerId === "number";
 
   return hasBody && hasHeader && hasAnswers;
 }
@@ -50,14 +52,16 @@ export class Question extends Model {
   id: QuestionId;
   body: RichText;
   header: RichText;
-
+  order: number;
   answers: Answer[];
+  answerId: number;
 
   toDatastore(): QuestionDoc {
     return {
       body: this.body.toDatastore(),
-      id: this.id,
       header: this.header.toDatastore(),
+      order: this.order,
+      answerId: this.answerId,
       answers: this.answers.map(answer => answer.toDatastore())
     };
   }
@@ -70,6 +74,8 @@ export class Question extends Model {
     const q = new Question();
 
     q.id = id;
+    q.order = data.order || -1;
+    q.answerId = data.answerId;
     q.answers = data.answers.map((answer, i) =>
       Answer.fromDatastore(answer, i)
     );
