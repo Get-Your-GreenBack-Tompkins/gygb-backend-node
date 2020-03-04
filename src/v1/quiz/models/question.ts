@@ -34,9 +34,8 @@ export function isQuestionDocument(
   const hasHeader = data.header && isRichTextData(data.header);
   const hasAnswers =
     data.answers && data.answers.every(answer => isAnswer(answer));
-  const hasAnswerId = data.answerId && typeof data.answerId === "number";
-
-  return hasBody && hasHeader && hasAnswers;
+  const hasAnswerId = "answerId" in data && typeof data.answerId === "number";
+  return hasBody && hasHeader && hasAnswers && hasAnswerId;
 }
 
 export function isQuestionEdit(data: unknown): data is QuestionEdit {
@@ -60,8 +59,9 @@ export class Question extends Model {
     return {
       body: this.body.toDatastore(),
       header: this.header.toDatastore(),
-      order: this.order,
-      answerId: this.answerId,
+      order: typeof this.order === "number" ? this.order : -1,
+      answerId:
+        typeof this.answerId === "number" ? this.answerId : this.answers.length,
       answers: this.answers.map(answer => answer.toDatastore())
     };
   }
@@ -74,10 +74,12 @@ export class Question extends Model {
     const q = new Question();
 
     q.id = id;
-    q.order = data.order || -1;
-    q.answerId = data.answerId;
-    q.answers = data.answers.map((answer, i) =>
-      Answer.fromDatastore(answer, i)
+    q.order = typeof data.order === "number" ? data.order : -1;
+    q.answerId = data.answerId || data.answers.length;
+    q.answers = data.answers.map(answer =>
+      answer.id
+        ? Answer.fromDatastore(answer)
+        : Answer.fromDatastore({ id: ++q.answerId, ...answer })
     );
     q.body = RichText.fromDatastore(data.body);
     q.header = RichText.fromDatastore(data.header);
@@ -97,13 +99,14 @@ export class Question extends Model {
   }
 
   toJSON() {
-    const { id, body, header, answers } = this;
+    const { id, body, header, answers, answerId } = this;
 
     return {
       id,
       body,
       header,
-      answers
+      answers,
+      answerId
     };
   }
 }
