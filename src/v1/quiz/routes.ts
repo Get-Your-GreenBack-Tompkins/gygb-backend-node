@@ -65,6 +65,7 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
       const body = req.body as unknown;
 
       if (!isQuestionEdit(body)) {
+        console.log("Attempted Bad Question Edit: ", body);
         return res
           .status(Status.BAD_REQUEST)
           .send({ message: "Not a valid question edit." });

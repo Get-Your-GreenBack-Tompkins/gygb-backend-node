@@ -22,6 +22,8 @@ export type QuestionEdit = {
   body: string;
   header: string;
   answers: AnswerEdit[];
+  order: number;
+  answerId: number;
 };
 
 export function isQuestionDocument(
@@ -43,6 +45,8 @@ export function isQuestionEdit(data: unknown): data is QuestionEdit {
   return (
     typeof asEdit.body === "string" &&
     typeof asEdit.header === "string" &&
+    typeof asEdit.order === "number" &&
+    typeof asEdit.answerId === "number" &&
     asEdit.answers.every(answer => isAnswerEdit(answer))
   );
 }
@@ -59,7 +63,7 @@ export class Question extends Model {
     return {
       body: this.body.toDatastore(),
       header: this.header.toDatastore(),
-      order: typeof this.order === "number" ? this.order : -1,
+      order: this.order,
       answerId:
         typeof this.answerId === "number" ? this.answerId : this.answers.length,
       answers: this.answers.map(answer => answer.toDatastore())
@@ -74,13 +78,9 @@ export class Question extends Model {
     const q = new Question();
 
     q.id = id;
-    q.order = typeof data.order === "number" ? data.order : -1;
-    q.answerId = data.answerId || data.answers.length;
-    q.answers = data.answers.map(answer =>
-      answer.id
-        ? Answer.fromDatastore(answer)
-        : Answer.fromDatastore({ id: ++q.answerId, ...answer })
-    );
+    q.order = data.order;
+    q.answerId = data.answerId;
+    q.answers = data.answers.map(answer => Answer.fromDatastore(answer));
     q.body = RichText.fromDatastore(data.body);
     q.header = RichText.fromDatastore(data.header);
 
@@ -91,6 +91,8 @@ export class Question extends Model {
     const q = new Question();
 
     q.id = id;
+    q.order = data.order;
+    q.answerId = data.answerId;
     q.answers = data.answers.map(answer => Answer.fromJSON(answer));
     q.body = RichText.fromJSON(data.body);
     q.header = RichText.fromJSON(data.header);
