@@ -9,6 +9,21 @@ export type AnswerDoc = {
   correct: boolean;
 };
 
+export type AnswerEdit = {
+  id: number;
+  text: string;
+  correct: boolean;
+}
+
+export function isAnswerEdit(data: unknown) {
+  const asEdit = data as AnswerEdit;
+  return (
+    typeof asEdit.id === 'number'
+    && typeof asEdit.text === 'string'
+    && typeof asEdit.correct === 'boolean'
+  );
+}
+
 export function isAnswer(data: unknown) {
   if (typeof data !== "object") {
     return false;
@@ -39,6 +54,14 @@ export class Answer {
       text,
       correct
     };
+  }
+
+  static fromJSON(data: AnswerEdit): Answer {
+    const answer = new Answer();
+    answer.id = data.id;
+    answer.text = RichText.fromJSON(data.text);
+    answer.correct = data.correct;
+    return answer;
   }
 
   static fromDatastore(doc: AnswerDoc, index: number): Answer {

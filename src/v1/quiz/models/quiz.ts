@@ -27,7 +27,7 @@ export class Quiz extends Model {
     return {
       id,
       name,
-      questions
+      questions: questions.sort((a, b) => a.order - b.order)
     };
   }
 
