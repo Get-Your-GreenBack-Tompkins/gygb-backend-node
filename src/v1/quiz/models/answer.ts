@@ -64,9 +64,9 @@ export class Answer {
     return answer;
   }
 
-  static fromDatastore(doc: AnswerDoc, index: number): Answer {
+  static fromDatastore(doc: AnswerDoc): Answer {
     const answer = new Answer();
-    answer.id = index;
+    answer.id = doc.id;
     answer.text = RichText.fromDatastore(doc.text);
     answer.correct = doc.correct;
     return answer;

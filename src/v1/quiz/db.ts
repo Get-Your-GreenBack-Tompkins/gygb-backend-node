@@ -19,6 +19,7 @@ export class QuizDB {
     const questionData = await questionDoc.get();
 
     if (!isQuestionDocument(questionData)) {
+      console.log("Document: ", questionData);
       throw new Error("Invalid question in quiz!");
     }
 
@@ -82,7 +83,8 @@ export class QuizDB {
       const questionDoc = await d.get();
 
       if (!isQuestionDocument(questionDoc)) {
-        throw new Error("Invalid question in quiz!");
+        console.log(questionDoc.data());
+        throw new Error("Invalid question in quiz! (2)");
       }
 
       const question = Question.fromDatastore(

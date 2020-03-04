@@ -13,7 +13,14 @@ export function textToDelta(text: string) {
 
 export function renderDeltaString(delta: string) {
   // Parse the delta string.
-  const parsedDelta = JSON.parse(delta);
+  let parsedDelta;
+
+  try {
+    parsedDelta = JSON.parse(delta);
+  } catch (err) {
+    parsedDelta = { ops: [] };
+    console.log(`Overriding delta string: ${delta}.`);
+  }
 
   // We'll start with a quite restrictive subset of HTML.
   const opts = {
