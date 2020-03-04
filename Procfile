@@ -1,1 +1,1 @@
-web: node dist/app.js --redis
+web: node dist/app.js
