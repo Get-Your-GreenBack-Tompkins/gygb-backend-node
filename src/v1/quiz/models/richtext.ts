@@ -1,4 +1,4 @@
-import { QuillDeltaToHtmlConverter } from "quill-delta-to-html";
+import { QuillDeltaToHtmlConverter, DeltaInsertOp } from "quill-delta-to-html";
 import sanitize from "sanitize-html";
 
 export type RichTextData = {
@@ -9,6 +9,10 @@ export type RichTextData = {
 
 export function textToDelta(text: string) {
   return { ops: [{ insert: text }] };
+}
+
+export function emptyDelta() {
+  return { ops: [] as DeltaInsertOp[] };
 }
 
 export function renderDeltaString(delta: string) {
@@ -53,13 +57,12 @@ export function isRichTextData(data: unknown) {
 }
 
 export class RichText {
-  // This isn't technically a "model" (it isn't a document)
   private delta: string;
   private rendered: string;
   private sanitized: string;
 
   constructor(text?: string) {
-    if (text) {
+    if (typeof text === "string") {
       const delta = JSON.stringify(textToDelta(text));
       const { __superDangerousHtml, sanitizedHtml } = renderDeltaString(delta);
 
@@ -67,7 +70,7 @@ export class RichText {
       this.rendered = __superDangerousHtml;
       this.sanitized = sanitizedHtml;
     } else {
-      this.delta = "[]";
+      this.delta = JSON.stringify(emptyDelta());
       this.rendered = "";
       this.sanitized = "";
     }

@@ -38,6 +38,30 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
     })
   );
 
+  router.put(
+    "/:quizId/question/:questionId/answer/",
+    asyncify(async (req, res) => {
+      const { quizId, questionId } = req.params;
+
+      await quizdb.addAnswer(quizId, questionId);
+
+      res.status(Status.CREATED).send({ message: "Added." });
+    })
+  );
+
+  router.delete(
+    "/:quizId/question/:questionId/answer/:answerId",
+    asyncify(async (req, res) => {
+      const { quizId, questionId, answerId } = req.params;
+
+      const id = Number.parseInt(answerId);
+
+      await quizdb.deleteAnswer(quizId, questionId, id);
+
+      res.status(Status.CREATED).send({ message: "Added." });
+    })
+  );
+
   router.get(
     "/:quizId/question/:questionId/edit",
     asyncify(async (req, res) => {

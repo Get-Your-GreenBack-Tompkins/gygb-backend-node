@@ -1,5 +1,3 @@
-import { Model } from "../../model";
-
 import { RichText, RichTextData, isRichTextData } from "./richtext";
 
 export type AnswerId = string;
@@ -13,14 +11,14 @@ export type AnswerEdit = {
   id: number;
   text: string;
   correct: boolean;
-}
+};
 
 export function isAnswerEdit(data: unknown) {
   const asEdit = data as AnswerEdit;
   return (
-    typeof asEdit.id === 'number'
-    && typeof asEdit.text === 'string'
-    && typeof asEdit.correct === 'boolean'
+    typeof asEdit.id === "number" &&
+    typeof asEdit.text === "string" &&
+    typeof asEdit.correct === "boolean"
   );
 }
 
@@ -42,10 +40,22 @@ export function isAnswerDocument(
 }
 
 export class Answer {
-
   id: number;
   text: RichText;
   correct: boolean;
+
+  constructor(params: { id: number; text: RichText; correct?: boolean }) {
+    const { id, text } = params;
+
+    this.id = id;
+    this.text = text;
+
+    if ("correct" in params) {
+      this.correct = params.correct;
+    } else {
+      this.correct = false;
+    }
+  }
 
   toJSON() {
     const { id, text, correct } = this;
@@ -56,19 +66,35 @@ export class Answer {
     };
   }
 
+  static blank(params: { id: number; correct?: boolean }) {
+    const { id } = params;
+
+    const rt = new RichText();
+
+    if ("correct" in params) {
+      return new Answer({ id, text: rt, correct: params.correct });
+    } else {
+      return new Answer({ id, text: rt });
+    }
+  }
+
   static fromJSON(data: AnswerEdit): Answer {
-    const answer = new Answer();
-    answer.id = data.id;
-    answer.text = RichText.fromJSON(data.text);
-    answer.correct = data.correct;
+    const { id, text, correct } = data;
+
+    const answer = new Answer({ id, text: RichText.fromJSON(text), correct });
+
     return answer;
   }
 
   static fromDatastore(doc: AnswerDoc): Answer {
-    const answer = new Answer();
-    answer.id = doc.id;
-    answer.text = RichText.fromDatastore(doc.text);
-    answer.correct = doc.correct;
+    const { id, text, correct } = doc;
+
+    const answer = new Answer({
+      id,
+      text: RichText.fromDatastore(text),
+      correct
+    });
+
     return answer;
   }
 

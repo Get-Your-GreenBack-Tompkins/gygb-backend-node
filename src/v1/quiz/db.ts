@@ -5,6 +5,10 @@ import { isAnswerDocument, AnswerDoc, Answer, isAnswer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
 import { RichText } from "./models/richtext";
 
+export enum QuizCollection {
+  QUESTIONS = "questions"
+}
+
 export class QuizDB {
   private db: V1DB;
 
@@ -34,7 +38,7 @@ export class QuizDB {
   async deleteQuestion(quizId: string, questionId: string) {
     const quizDoc = await this.db.quiz().doc(quizId);
 
-    const result = quizDoc.collection("questions");
+    const result = quizDoc.collection(QuizCollection.QUESTIONS);
 
     await result.doc(questionId).delete();
   }
@@ -47,17 +51,66 @@ export class QuizDB {
       throw new Error("Invalid quiz.");
     }
 
-    const result = await quizDoc.collection("questions");
+    const result = quizDoc.collection(QuizCollection.QUESTIONS);
 
     const questions = await result.listDocuments();
-    const question = new Question();
     const number = questions.length + 1;
-    question.answers = [];
-    question.body = new RichText();
-    question.header = new RichText(`Question ${number}`);
-    question.order = number;
-    question.answerId = 0;
-    await result.add(question.toDatastore());
+
+    const document = result.doc();
+
+    const question = new Question({
+      id: document.id,
+      answers: [],
+      body: new RichText(),
+      header: `Question ${number}`,
+      order: number,
+      answerId: 0
+    });
+
+    await document.set(question.toDatastore());
+  }
+
+  async addAnswer(quizId: string, questionId: string) {
+    const quizDoc = await this.db.quiz().doc(quizId);
+    const result = await quizDoc.collection("questions").doc(questionId);
+    const doc = await result.get();
+
+    if (isQuestionDocument(doc)) {
+      const question = Question.fromDatastore(result.id, doc.data());
+
+      const nextId = question.answerId + 1;
+
+      const answer = Answer.blank({ id: nextId });
+      question.answers.push(answer);
+      question.answerId = nextId;
+      console.log(JSON.stringify(question.toDatastore(), null, 4));
+      await result.set(question.toDatastore());
+
+      return nextId;
+    } else {
+      throw new Error("Invalid question document.");
+    }
+  }
+
+  async deleteAnswer(quizId: string, questionId: string, answerId: number) {
+    const quizDoc = await this.db.quiz().doc(quizId);
+    const result = await quizDoc.collection("questions").doc(questionId);
+    const doc = await result.get();
+
+    if (isQuestionDocument(doc)) {
+      const question = Question.fromDatastore(result.id, doc.data());
+
+      const answerIndex = question.answers.findIndex(a => a.id === answerId);
+      if (answerIndex !== -1) {
+        question.answers.splice(answerIndex, 1);
+
+        await result.set(question.toDatastore());
+      } else {
+        throw new Error("Bad answer id.");
+      }
+    } else {
+      throw new Error("Invalid question document.");
+    }
   }
 
   async updateQuestion(quizId: string, question: Question): Promise<number> {

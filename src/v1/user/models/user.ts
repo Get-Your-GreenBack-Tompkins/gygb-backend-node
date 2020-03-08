@@ -37,11 +37,14 @@ export function isUserQueryDocument(
 }
 
 export class User extends Model {
-  id: string;
   email: string;
   sources: UserSource[];
   marketingConsent: boolean;
   photoConsent: boolean;
+
+  constructor(id: string) {
+    super(id);
+  }
 
   toJSON() {
     const { id, email, sources, marketingConsent, photoConsent } = this;
@@ -66,9 +69,8 @@ export class User extends Model {
   }
 
   static fromDatastore(id: string, doc: UserDoc) {
-    const user = new User();
+    const user = new User(id);
 
-    user.id = id;
     user.email = doc.email;
     user.marketingConsent = doc.marketingConsent;
     user.photoConsent = doc.photoConsent;
