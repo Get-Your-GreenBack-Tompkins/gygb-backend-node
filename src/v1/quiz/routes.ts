@@ -3,6 +3,7 @@ import * as Status from "http-status-codes";
 
 import { Redis } from "ioredis";
 
+import { ApiError } from "../../api/util";
 import { cache, cacheResult } from "../../middleware/cache";
 import { asyncify } from "../../middleware/async";
 
@@ -10,6 +11,14 @@ import { V1DB } from "../db";
 
 import { QuizDB } from "./db";
 import { Question, isQuestionEdit } from "./models/question";
+
+function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
+  return (
+    typeof obj === "object" &&
+    Object.keys(obj).every(k => typeof k === "string") &&
+    Object.values(obj).every(v => typeof v === "number")
+  );
+}
 
 export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
   const router = express.Router();
@@ -33,6 +42,30 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
       const { quizId } = req.params;
 
       await quizdb.addQuestion(quizId);
+
+      res.status(Status.CREATED).send({ message: "Added." });
+    })
+  );
+
+  router.put(
+    "/:quizId/question/:questionId/answer/",
+    asyncify(async (req, res) => {
+      const { quizId, questionId } = req.params;
+
+      await quizdb.addAnswer(quizId, questionId);
+
+      res.status(Status.CREATED).send({ message: "Added." });
+    })
+  );
+
+  router.delete(
+    "/:quizId/question/:questionId/answer/:answerId",
+    asyncify(async (req, res) => {
+      const { quizId, questionId, answerId } = req.params;
+
+      const id = Number.parseInt(answerId);
+
+      await quizdb.deleteAnswer(quizId, questionId, id);
 
       res.status(Status.CREATED).send({ message: "Added." });
     })
@@ -92,35 +125,53 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
     asyncify(async (req, res) => {
       const { quizId, questionId, answerId } = req.params;
 
-      const question = await quizdb.getQuestion(quizId, questionId);
+      const id = Number.parseInt(answerId);
 
-      if (question) {
-        const correct = question.answers[Number.parseInt(answerId)].correct;
-
-        // TODO Allow the message to be dynamic.
-
-        if (correct) {
-          res.status(Status.OK).send({
-            quizId,
-            questionId,
-            answerId,
-            correct,
-            message: "Congrats!"
-          });
-        } else {
-          res.status(Status.OK).send({
-            quizId,
-            questionId,
-            answerId,
-            correct,
-            message: "Whoops try again!"
-          });
-        }
-      } else {
-        res
-          .status(Status.NOT_FOUND)
-          .send({ message: "Question does not exist!" });
+      if (Number.isNaN(id)) {
+        return res
+          .status(Status.BAD_REQUEST)
+          .send({ message: "Invalid answer ID passed." });
       }
+
+      const correct = await quizdb.isCorrect(quizId, questionId, id);
+
+      if (correct) {
+        res.status(Status.OK).send({
+          quizId,
+          questionId,
+          answerId,
+          correct,
+          message: "Congrats!"
+        });
+      } else {
+        res.status(Status.OK).send({
+          quizId,
+          questionId,
+          answerId,
+          correct,
+          message: "Whoops try again!"
+        });
+      }
+    })
+  );
+
+  router.post(
+    "/:quizId/verify",
+    // TODO Cache
+    asyncify(async (req, res) => {
+      const { quizId } = req.params;
+
+      const answers = req.body.answers;
+
+      if (!isAnswerMap(answers)) {
+        throw ApiError.invalidRequest(`Invalid answer map.`);
+      }
+
+      const stats = await quizdb.correctAnswers(quizId, answers);
+
+      res.status(Status.OK).send({
+        ...stats
+      });
     })
   );
 

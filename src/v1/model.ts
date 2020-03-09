@@ -13,6 +13,12 @@ export type Json =
   | Json[];
 
 export abstract class Model {
+  id: string;
+
+  protected constructor(id: string) {
+    this.id = id;
+  }
+
   abstract toJSON(): json | Json;
   abstract toDatastore(): json;
 

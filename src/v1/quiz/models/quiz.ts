@@ -22,6 +22,14 @@ export class Quiz extends Model {
   name: string;
   questions: Question[];
 
+  constructor(params: { id: string; name: string; questions: Question[] }) {
+    const { id, name, questions } = params;
+    super(id);
+
+    this.name = name;
+    this.questions = questions;
+  }
+
   toJSON() {
     const { id, questions, name } = this;
     return {
@@ -38,10 +46,8 @@ export class Quiz extends Model {
     const { name } = quizDoc;
 
     return (questions: Question[]) => {
-      const quiz = new Quiz();
-      quiz.id = id;
-      quiz.questions = questions;
-      quiz.name = name;
+      const quiz = new Quiz({ id, questions, name });
+
       return quiz;
     };
   }
