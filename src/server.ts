@@ -37,7 +37,7 @@ export default async function serve(
 
   const auth = initializeAuth(db);
 
-  app.use("/v1/", auth, initRedis ? v1(db, redis) : v1(db));
+  app.use("/v1/", initRedis ? v1(db, auth, redis) : v1(db, auth));
 
   let server = app.listen(process.env.PORT || 5150, () => {
     const addr = server.address();

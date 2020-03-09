@@ -43,13 +43,18 @@ function hasSource(x: unknown): x is { source: UserSource } {
   );
 }
 
-export default function defineRoutes(db: V1DB, _?: Redis): express.Router {
+export default function defineRoutes(
+  db: V1DB,
+  auth: express.RequestHandler,
+  _?: Redis
+): express.Router {
   const router = express.Router();
 
   const userdb = new UserDB(db);
 
   router.get(
     "/emails/marketing",
+    auth,
     asyncify(async (_, res) => {
       const users = await userdb.getEmailList();
 

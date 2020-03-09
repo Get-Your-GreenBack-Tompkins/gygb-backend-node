@@ -20,178 +20,201 @@ function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
   );
 }
 
-export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
-  const router = express.Router();
-
+export default function defineRoutes(
+  db: V1DB,
+  auth: express.RequestHandler,
+  redis?: Redis
+): express.Router {
   const quizdb = new QuizDB(db);
 
-  router.delete(
-    "/:quizId/question/:questionId/",
-    asyncify(async (req, res) => {
-      const { quizId, questionId } = req.params;
+  function setupAuthenticated(authenticated: express.Router) {
+    // Enable authentication
+    authenticated.use(auth);
 
-      await quizdb.deleteQuestion(quizId, questionId);
+    authenticated.delete(
+      "/:quizId/question/:questionId/",
+      asyncify(async (req, res) => {
+        const { quizId, questionId } = req.params;
 
-      res.status(Status.OK).send({ message: "Deleted." });
-    })
-  );
+        await quizdb.deleteQuestion(quizId, questionId);
 
-  router.put(
-    "/:quizId/question/",
-    asyncify(async (req, res) => {
-      const { quizId } = req.params;
+        res.status(Status.OK).send({ message: "Deleted." });
+      })
+    );
 
-      await quizdb.addQuestion(quizId);
+    authenticated.put(
+      "/:quizId/question/",
+      asyncify(async (req, res) => {
+        const { quizId } = req.params;
 
-      res.status(Status.CREATED).send({ message: "Added." });
-    })
-  );
+        await quizdb.addQuestion(quizId);
 
-  router.put(
-    "/:quizId/question/:questionId/answer/",
-    asyncify(async (req, res) => {
-      const { quizId, questionId } = req.params;
+        res.status(Status.CREATED).send({ message: "Added." });
+      })
+    );
 
-      await quizdb.addAnswer(quizId, questionId);
+    authenticated.put(
+      "/:quizId/question/:questionId/answer/",
+      auth,
+      asyncify(async (req, res) => {
+        const { quizId, questionId } = req.params;
 
-      res.status(Status.CREATED).send({ message: "Added." });
-    })
-  );
+        await quizdb.addAnswer(quizId, questionId);
 
-  router.delete(
-    "/:quizId/question/:questionId/answer/:answerId",
-    asyncify(async (req, res) => {
-      const { quizId, questionId, answerId } = req.params;
+        res.status(Status.CREATED).send({ message: "Added." });
+      })
+    );
 
-      const id = Number.parseInt(answerId);
+    authenticated.delete(
+      "/:quizId/question/:questionId/answer/:answerId",
+      asyncify(async (req, res) => {
+        const { quizId, questionId, answerId } = req.params;
 
-      await quizdb.deleteAnswer(quizId, questionId, id);
+        const id = Number.parseInt(answerId);
 
-      res.status(Status.CREATED).send({ message: "Added." });
-    })
-  );
+        await quizdb.deleteAnswer(quizId, questionId, id);
 
-  router.get(
-    "/:quizId/question/:questionId/edit",
-    asyncify(async (req, res) => {
-      // TODO Authenticate
+        res.status(Status.CREATED).send({ message: "Added." });
+      })
+    );
 
-      const { quizId, questionId } = req.params;
+    authenticated.get(
+      "/:quizId/question/:questionId/edit",
+      asyncify(async (req, res) => {
+        // TODO Authenticate
 
-      const question = await quizdb.getQuestion(quizId, questionId);
+        const { quizId, questionId } = req.params;
 
-      if (question) {
-        res.json(question.toDatastore());
-      } else {
-        return res
-          .status(Status.NOT_FOUND)
-          .send({ message: "Question not found. " });
-      }
-    })
-  );
+        const question = await quizdb.getQuestion(quizId, questionId);
 
-  router.post(
-    "/:quizId/question/:questionId/edit",
-    asyncify(async (req, res) => {
-      // TODO Authenticate
-      const { quizId, questionId } = req.params;
-      const body = req.body as unknown;
+        if (question) {
+          res.json(question.toDatastore());
+        } else {
+          return res
+            .status(Status.NOT_FOUND)
+            .send({ message: "Question not found. " });
+        }
+      })
+    );
 
-      if (!isQuestionEdit(body)) {
-        console.log("Attempted Bad Question Edit: ", body);
-        return res
-          .status(Status.BAD_REQUEST)
-          .send({ message: "Not a valid question edit." });
-      }
+    authenticated.post(
+      "/:quizId/question/:questionId/edit",
+      asyncify(async (req, res) => {
+        // TODO Authenticate
+        const { quizId, questionId } = req.params;
+        const body = req.body as unknown;
 
-      const newQuestion = Question.fromJSON(questionId, body);
+        if (!isQuestionEdit(body)) {
+          console.log("Attempted Bad Question Edit: ", body);
+          return res
+            .status(Status.BAD_REQUEST)
+            .send({ message: "Not a valid question edit." });
+        }
 
-      const nanoseconds = await quizdb.updateQuestion(quizId, newQuestion);
+        const newQuestion = Question.fromJSON(questionId, body);
 
-      // TODO Remove
-      console.log(`Updated in ${nanoseconds} nanoseconds!`);
+        const nanoseconds = await quizdb.updateQuestion(quizId, newQuestion);
 
-      res.status(Status.OK).send({ nanoseconds });
-    })
-  );
+        // TODO Remove
+        console.log(`Updated in ${nanoseconds} nanoseconds!`);
 
-  router.get(
-    "/:quizId/question/:questionId/verify-answer/:answerId",
-    cache(req => {
-      const { quizId, questionId, answerId } = req.params;
+        res.status(Status.OK).send({ nanoseconds });
+      })
+    );
 
-      return `verifyAnswer(${quizId}, ${questionId}, ${answerId}})`;
-    }),
-    asyncify(async (req, res) => {
-      const { quizId, questionId, answerId } = req.params;
+    return authenticated;
+  }
 
-      const id = Number.parseInt(answerId);
+  function setupUnauthenticated(unauthenticated: express.Router) {
+    unauthenticated.get(
+      "/:quizId/question/:questionId/verify-answer/:answerId",
+      cache(req => {
+        const { quizId, questionId, answerId } = req.params;
 
-      if (Number.isNaN(id)) {
-        return res
-          .status(Status.BAD_REQUEST)
-          .send({ message: "Invalid answer ID passed." });
-      }
+        return `verifyAnswer(${quizId}, ${questionId}, ${answerId}})`;
+      }),
+      asyncify(async (req, res) => {
+        const { quizId, questionId, answerId } = req.params;
 
-      const correct = await quizdb.isCorrect(quizId, questionId, id);
+        const id = Number.parseInt(answerId);
 
-      if (correct) {
+        if (Number.isNaN(id)) {
+          return res
+            .status(Status.BAD_REQUEST)
+            .send({ message: "Invalid answer ID passed." });
+        }
+
+        const correct = await quizdb.isCorrect(quizId, questionId, id);
+
+        if (correct) {
+          res.status(Status.OK).send({
+            quizId,
+            questionId,
+            answerId,
+            correct,
+            message: "Congrats!"
+          });
+        } else {
+          res.status(Status.OK).send({
+            quizId,
+            questionId,
+            answerId,
+            correct,
+            message: "Whoops try again!"
+          });
+        }
+      })
+    );
+
+    unauthenticated.post(
+      "/:quizId/verify",
+      // TODO Cache
+      asyncify(async (req, res) => {
+        const { quizId } = req.params;
+
+        const answers = req.body.answers;
+
+        if (!isAnswerMap(answers)) {
+          throw ApiError.invalidRequest(`Invalid answer map.`);
+        }
+
+        const stats = await quizdb.correctAnswers(quizId, answers);
+
         res.status(Status.OK).send({
-          quizId,
-          questionId,
-          answerId,
-          correct,
-          message: "Congrats!"
+          ...stats
         });
-      } else {
-        res.status(Status.OK).send({
-          quizId,
-          questionId,
-          answerId,
-          correct,
-          message: "Whoops try again!"
-        });
-      }
-    })
-  );
+      })
+    );
 
-  router.post(
-    "/:quizId/verify",
-    // TODO Cache
-    asyncify(async (req, res) => {
-      const { quizId } = req.params;
+    unauthenticated.get(
+      "/:id",
+      cache(
+        r => (r.params.id ? `quizById(${r.params.id})` : `quizById`),
+        redis
+      ),
+      asyncify(async (req, res) => {
+        const { id } = req.params;
 
-      const answers = req.body.answers;
+        const quiz = await quizdb.getQuiz(id);
 
-      if (!isAnswerMap(answers)) {
-        throw ApiError.invalidRequest(`Invalid answer map.`);
-      }
+        const cachedRes = cacheResult(res, redis);
 
-      const stats = await quizdb.correctAnswers(quizId, answers);
+        if (quiz) {
+          cachedRes.send(Status.OK, quiz.toJSON());
+        } else {
+          cachedRes.send(Status.NOT_FOUND, { message: "Quiz does not exist!" });
+        }
+      })
+    );
 
-      res.status(Status.OK).send({
-        ...stats
-      });
-    })
-  );
+    return unauthenticated;
+  }
 
-  router.get(
-    "/:id",
-    cache(r => (r.params.id ? `quizById(${r.params.id})` : `quizById`), redis),
-    asyncify(async (req, res) => {
-      const { id } = req.params;
+  const unauthenticated = setupUnauthenticated(express.Router());
+  const authenticated = setupAuthenticated(express.Router());
 
-      const quiz = await quizdb.getQuiz(id);
+  // This ensures the unauthenticated routes are handled first.
+  unauthenticated.use(authenticated);
 
-      const cachedRes = cacheResult(res, redis);
-
-      if (quiz) {
-        cachedRes.send(Status.OK, quiz.toJSON());
-      } else {
-        cachedRes.send(Status.NOT_FOUND, { message: "Quiz does not exist!" });
-      }
-    })
-  );
-
-  return router;
+  return unauthenticated;
 }
