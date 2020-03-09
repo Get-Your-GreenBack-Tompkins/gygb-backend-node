@@ -1,8 +1,10 @@
 import express from "express";
+import cors from "cors";
 
 import v1 from "./v1/routes";
 
 import { apiErrors } from "./middleware/error";
+import { initializeAuth } from "./middleware/auth/middleware";
 import { GreenBackDB } from "./db";
 
 import redis from "./redis";
@@ -30,17 +32,12 @@ export default async function serve(
   app.use(apiErrors);
   app.use(express.json());
 
-  app.use((_, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, Content-Length, X-Requested-With, Accept"
-    );
-    next();
-  });
+  app.use(cors({ origin: "*" }));
+  app.options("*", cors({ origin: "*" }));
 
-  app.use("/v1/", initRedis ? v1(db, redis) : v1(db));
+  const auth = initializeAuth(db);
+
+  app.use("/v1/", auth, initRedis ? v1(db, redis) : v1(db));
 
   let server = app.listen(process.env.PORT || 5150, () => {
     const addr = server.address();
