@@ -161,7 +161,7 @@ export class QuizDB {
 
     const { answers, answerId } = question.toDatastore();
     const update = { answers, answerId };
-    console.log(JSON.stringify(question.toDatastore(), null, 4));
+
     await result.set(update, { mergeFields: ["answers", "answerId"] });
 
     return nextId;
