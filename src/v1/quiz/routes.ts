@@ -155,7 +155,7 @@ export default function defineRoutes(db: V1DB, redis?: Redis): express.Router {
     })
   );
 
-  router.get(
+  router.post(
     "/:quizId/verify",
     // TODO Cache
     asyncify(async (req, res) => {
