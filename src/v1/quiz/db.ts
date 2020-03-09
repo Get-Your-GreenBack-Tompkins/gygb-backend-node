@@ -138,7 +138,10 @@ export class QuizDB {
 
   async addAnswer(quizId: string, questionId: string): Promise<number> {
     const quizDoc = await this.db.quiz().doc(quizId);
-    const result = await quizDoc.collection("questions").doc(questionId);
+    const result = await quizDoc
+      .collection(QuizCollection.QUESTIONS)
+      .doc(questionId);
+
     const doc = await result.get();
 
     if (!isQuestionDocument(doc)) {
@@ -152,10 +155,14 @@ export class QuizDB {
     const nextId = question.answerId + 1;
 
     const answer = Answer.blank({ id: nextId });
+
     question.answers.push(answer);
     question.answerId = nextId;
+
+    const { answers, answerId } = question.toDatastore();
+    const update = { answers, answerId };
     console.log(JSON.stringify(question.toDatastore(), null, 4));
-    await result.set(question.toDatastore());
+    await result.set(update, { mergeFields: ["answers", "answerId"] });
 
     return nextId;
   }
@@ -189,15 +196,14 @@ export class QuizDB {
   async updateQuestion(quizId: string, question: Question): Promise<number> {
     const quizDoc = await this.db.quiz().doc(quizId);
 
-    const { header, body, order } = question.toDatastore();
-    const update = { header, body, order };
+    const { header, body, order, answers } = question.toDatastore();
+    const update = { header, body, order, answers };
 
     const result = await quizDoc
       .collection(QuizCollection.QUESTIONS)
       .doc(question.id)
       .set(update, {
-        merge: true,
-        mergeFields: ["body", "header", "order"]
+        mergeFields: ["body", "header", "order", "answers"]
       });
 
     return result.writeTime.nanoseconds;
