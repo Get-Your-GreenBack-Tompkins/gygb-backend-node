@@ -7,6 +7,7 @@ import { Answer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
 import { RichText } from "./models/richtext";
 import { Raffle, isRaffleQueryDocument } from "./models/raffle";
+import { Tutorial } from "./models/tutorial";
 
 export enum QuizCollection {
   QUESTIONS = "questions"
@@ -78,6 +79,12 @@ export class QuizDB {
 
   getQuiz(): Quiz {
     return this.quiz;
+  }
+
+  async getTutorial(): Promise<Tutorial> {
+    const quiz = await this.getQuiz();
+    
+    return quiz.tutorial;
   }
 
   async listen() {

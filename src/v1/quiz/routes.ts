@@ -138,6 +138,20 @@ export default async function defineRoutes(
 
   function setupUnauthenticated(unauthenticated: express.Router) {
     unauthenticated.get(
+      "/web-client/tutorial",
+      // TODO Cache
+      asyncify(async (_, res) => {
+        const tutorial = await quizdb.getTutorial();
+        const numOfQuestions = await quizdb.getQuiz().questionCount;
+
+        res.status(Status.OK).send({
+          ...tutorial,
+          totalQuestions: numOfQuestions
+        });
+      })
+    );
+
+    unauthenticated.get(
       "/web-client/raffle",
       asyncify(async (req, res) => {
         const raffle = await quizdb.getCurrentRaffle();
@@ -149,7 +163,7 @@ export default async function defineRoutes(
         const numberOfQuestions = (await quizdb.getQuiz()).questionCount;
 
         return res.status(Status.OK).send({
-          requirement: Math.floor(raffle.requirement * numberOfQuestions),
+          questionRequirement: Math.floor(raffle.requirement * numberOfQuestions),
           prize: raffle.prize
         });
       })

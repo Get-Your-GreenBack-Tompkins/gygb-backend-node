@@ -1,11 +1,13 @@
 import { Model } from "../../model";
 
 import { Question, QuestionDoc } from "./question";
+import { TutorialDoc, isTutorialDocument, Tutorial } from "./tutorial";
 
 export type QuizId = string;
 export type QuizDoc = {
   questionCount: number;
   name: string;
+  tutorial: TutorialDoc;
   questions: QuestionDoc[];
 };
 
@@ -20,7 +22,9 @@ export function isQuizQueryDocument(
     "name" in data &&
     typeof data.name === "string" &&
     "questionCount" in data &&
-    typeof data.questionCount === "number"
+    typeof data.questionCount === "number" &&
+    "tutorial" in data &&
+    isTutorialDocument(data.tutorial)
   );
 }
 
@@ -35,7 +39,9 @@ export function isQuizDocument(
     "name" in data &&
     typeof data.name === "string" &&
     "questionCount" in data &&
-    typeof data.questionCount === "number"
+    typeof data.questionCount === "number" &&
+    "tutorial" in data &&
+    isTutorialDocument(data.tutorial)
   );
 }
 
@@ -63,18 +69,26 @@ export class Quiz extends Model {
   name: string;
   questionCount: number;
   questions: Question[];
+  tutorial: Tutorial;
 
-  constructor(params: { id: string; name: string; questions: Question[]; questionCount: number }) {
-    const { id, name, questions, questionCount } = params;
+  constructor(params: {
+    id: string;
+    name: string;
+    questions: Question[];
+    questionCount: number;
+    tutorial: Tutorial;
+  }) {
+    const { id, name, questions, questionCount, tutorial } = params;
     super(id);
 
     this.name = name;
     this.questions = questions;
     this.questionCount = questionCount;
+    this.tutorial = tutorial;
   }
 
   toJSON() {
-    const { id, questions, name, questionCount } = this;
+    const { id, questions, name, questionCount, tutorial } = this;
 
     const length = Math.min(questions.length, questionCount);
 
@@ -87,22 +101,30 @@ export class Quiz extends Model {
     return {
       id,
       name,
-      questions: randomQuestions
+      questions: randomQuestions,
+      tutorial
     };
   }
 
   static fromDatastore(id: string, quizDoc: QuizDoc): (questions: Question[]) => Quiz {
-    const { name, questionCount } = quizDoc;
+    const { name, questionCount, tutorial } = quizDoc;
 
     return (questions: Question[]) => {
-      const quiz = new Quiz({ id, questions, questionCount, name });
+      const quiz = new Quiz({
+        id,
+        questions,
+        questionCount,
+        name,
+        tutorial: Tutorial.fromDatastore(tutorial)
+      });
 
       return quiz;
     };
   }
 
   toDatastore() {
-    const { name } = this;
-    return { name };
+    const { name, questionCount, tutorial } = this;
+
+    return { name, questionCount, tutorial: tutorial.toDatastore() };
   }
 }
