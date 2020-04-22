@@ -6,9 +6,7 @@ import serve from "./server";
 
 const db = new GreenBackDB();
 
-const redisFlag = process.argv.includes("--redis");
-
-serve(db, redisFlag)
+serve(db)
   .then(() => {
     console.log("Started!");
   })
