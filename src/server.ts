@@ -7,26 +7,9 @@ import { apiErrors } from "./middleware/error";
 import { initializeAuth } from "./middleware/auth/middleware";
 import { GreenBackDB } from "./db";
 
-import redis from "./redis";
-
 export default async function serve(
-  db: GreenBackDB,
-  initRedis: boolean = false
+  db: GreenBackDB
 ) {
-  if (initRedis) {
-    console.log("Attempting to connect to redis...");
-    try {
-      await redis.connect();
-      console.log("Redis connected!");
-    } catch (err) {
-      console.log("Redis was unable to connect, stopping server.");
-      redis.disconnect();
-      redis.removeAllListeners();
-
-      throw err;
-    }
-  }
-
   const app = express();
 
   app.use(apiErrors);
@@ -37,7 +20,7 @@ export default async function serve(
 
   const auth = initializeAuth(db);
 
-  app.use("/v1/", initRedis ? v1(db, auth, redis) : v1(db, auth));
+  app.use("/v1/", await v1(db, auth));
 
   let server = app.listen(process.env.PORT || 5150, () => {
     const addr = server.address();

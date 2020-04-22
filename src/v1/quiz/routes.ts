@@ -9,7 +9,7 @@ import { asyncify } from "../../middleware/async";
 
 import { V1DB } from "../db";
 
-import { QuizDB } from "./db";
+import { registerQuizDB } from "./db";
 import { Question, isQuestionEdit } from "./models/question";
 
 function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
@@ -20,100 +20,111 @@ function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
   );
 }
 
-export default function defineRoutes(
+export default async function defineRoutes(
   db: V1DB,
   auth: express.RequestHandler,
   redis?: Redis
-): express.Router {
-  const quizdb = new QuizDB(db);
+): Promise<express.Router> {
+  const quizdb = registerQuizDB(db, "web-client");
+
+  try {
+    await quizdb.listen();
+  } catch (error) {
+    console.error(error);
+  }
 
   function setupAuthenticated(authenticated: express.Router) {
     // Enable authentication
     authenticated.use(auth);
 
-    authenticated.delete(
-      "/:quizId/question/:questionId/",
+    authenticated.put(
+      "/web-client/raffle",
       asyncify(async (req, res) => {
-        const { quizId, questionId } = req.params;
+        const { prize, requirement } = req.body;
 
-        await quizdb.deleteQuestion(quizId, questionId);
+        const id = await quizdb.newRaffle(prize, requirement);
+
+        res.status(Status.OK).send({ id });
+      })
+    );
+
+    authenticated.delete(
+      "/web-client/question/:questionId/",
+      asyncify(async (req, res) => {
+        const { questionId } = req.params;
+
+        await quizdb.deleteQuestion(questionId);
 
         res.status(Status.OK).send({ message: "Deleted." });
       })
     );
 
     authenticated.put(
-      "/:quizId/question/",
+      "/web-client/question/",
       asyncify(async (req, res) => {
-        const { quizId } = req.params;
-
-        await quizdb.addQuestion(quizId);
+        await quizdb.addQuestion();
 
         res.status(Status.CREATED).send({ message: "Added." });
       })
     );
 
     authenticated.put(
-      "/:quizId/question/:questionId/answer/",
+      "/web-client/question/:questionId/answer/",
       auth,
       asyncify(async (req, res) => {
-        const { quizId, questionId } = req.params;
+        const { questionId } = req.params;
 
-        await quizdb.addAnswer(quizId, questionId);
+        await quizdb.addAnswer(questionId);
 
         res.status(Status.CREATED).send({ message: "Added." });
       })
     );
 
     authenticated.delete(
-      "/:quizId/question/:questionId/answer/:answerId",
+      "/web-client/question/:questionId/answer/:answerId",
       asyncify(async (req, res) => {
-        const { quizId, questionId, answerId } = req.params;
+        const { questionId, answerId } = req.params;
 
         const id = Number.parseInt(answerId);
 
-        await quizdb.deleteAnswer(quizId, questionId, id);
+        await quizdb.deleteAnswer(questionId, id);
 
         res.status(Status.CREATED).send({ message: "Added." });
       })
     );
 
     authenticated.get(
-      "/:quizId/question/:questionId/edit",
+      "/web-client/question/:questionId/edit",
       asyncify(async (req, res) => {
         // TODO Authenticate
 
-        const { quizId, questionId } = req.params;
+        const { questionId } = req.params;
 
-        const question = await quizdb.getQuestion(quizId, questionId);
+        const question = await quizdb.getQuestion(questionId);
 
         if (question) {
           res.json(question.toDatastore());
         } else {
-          return res
-            .status(Status.NOT_FOUND)
-            .send({ message: "Question not found. " });
+          return res.status(Status.NOT_FOUND).send({ message: "Question not found. " });
         }
       })
     );
 
     authenticated.post(
-      "/:quizId/question/:questionId/edit",
+      "/web-client/question/:questionId/edit",
       asyncify(async (req, res) => {
         // TODO Authenticate
-        const { quizId, questionId } = req.params;
+        const { questionId } = req.params;
         const body = req.body as unknown;
 
         if (!isQuestionEdit(body)) {
           console.log("Attempted Bad Question Edit: ", body);
-          return res
-            .status(Status.BAD_REQUEST)
-            .send({ message: "Not a valid question edit." });
+          return res.status(Status.BAD_REQUEST).send({ message: "Not a valid question edit." });
         }
 
         const newQuestion = Question.fromJSON(questionId, body);
 
-        const nanoseconds = await quizdb.updateQuestion(quizId, newQuestion);
+        const nanoseconds = await quizdb.updateQuestion(newQuestion);
 
         // TODO Remove
         console.log(`Updated in ${nanoseconds} nanoseconds!`);
@@ -127,28 +138,103 @@ export default function defineRoutes(
 
   function setupUnauthenticated(unauthenticated: express.Router) {
     unauthenticated.get(
-      "/:quizId/question/:questionId/verify-answer/:answerId",
+      "/web-client/tutorial",
+      // TODO Cache
+      asyncify(async (_, res) => {
+        const tutorial = await quizdb.getTutorial();
+        const numOfQuestions = await quizdb.getQuiz().questionCount;
+
+        res.status(Status.OK).send({
+          ...tutorial,
+          totalQuestions: numOfQuestions
+        });
+      })
+    );
+
+    unauthenticated.get(
+      "/web-client/raffle",
+      asyncify(async (req, res) => {
+        const raffle = await quizdb.getCurrentRaffle();
+
+        if (raffle == null) {
+          return res.status(Status.NOT_FOUND).send(null);
+        }
+
+        const numberOfQuestions = (await quizdb.getQuiz()).questionCount;
+
+        return res.status(Status.OK).send({
+          questionRequirement: Math.floor(raffle.requirement * numberOfQuestions),
+          prize: raffle.prize
+        });
+      })
+    );
+
+    unauthenticated.post(
+      "/web-client/raffle/enter",
+      asyncify(async (req, res) => {
+        const { answers = null, firstName = null, lastName = null, email = null } = req.body;
+
+        if (![answers, firstName, lastName, email].every(a => a != null)) {
+          throw ApiError.invalidRequest("Missing data.");
+        }
+
+        if (!isAnswerMap(answers)) {
+          throw ApiError.invalidRequest(`Invalid answer map.`);
+        }
+
+        const stats = await quizdb.correctAnswers(answers);
+
+        const percentage = stats.correct / stats.total;
+
+        const raffle = await quizdb.getCurrentRaffle();
+
+        if (raffle == null) {
+          throw ApiError.internalError("No raffle currently exists.");
+        }
+
+        const percentageRequired = raffle.requirement;
+
+        if (percentage > percentageRequired) {
+          await quizdb.addToRaffle({
+            raffleId: raffle.id,
+            firstName,
+            lastName,
+            email
+          });
+
+          return res.status(Status.OK).send({
+            success: true,
+            message: "You're in!"
+          });
+        } else {
+          return res.status(Status.OK).send({
+            success: false,
+            message: "You did score high enough to entry the lottery!"
+          });
+        }
+      })
+    );
+
+    unauthenticated.get(
+      "/web-client/question/:questionId/verify-answer/:answerId",
       cache(req => {
         const { quizId, questionId, answerId } = req.params;
 
         return `verifyAnswer(${quizId}, ${questionId}, ${answerId}})`;
       }),
       asyncify(async (req, res) => {
-        const { quizId, questionId, answerId } = req.params;
+        const { questionId, answerId } = req.params;
 
         const id = Number.parseInt(answerId);
 
         if (Number.isNaN(id)) {
-          return res
-            .status(Status.BAD_REQUEST)
-            .send({ message: "Invalid answer ID passed." });
+          return res.status(Status.BAD_REQUEST).send({ message: "Invalid answer ID passed." });
         }
 
-        const correct = await quizdb.isCorrect(quizId, questionId, id);
+        const correct = await quizdb.isCorrect(questionId, id);
 
         if (correct) {
           res.status(Status.OK).send({
-            quizId,
             questionId,
             answerId,
             correct,
@@ -156,7 +242,6 @@ export default function defineRoutes(
           });
         } else {
           res.status(Status.OK).send({
-            quizId,
             questionId,
             answerId,
             correct,
@@ -167,18 +252,16 @@ export default function defineRoutes(
     );
 
     unauthenticated.post(
-      "/:quizId/verify",
+      "/web-client/verify",
       // TODO Cache
       asyncify(async (req, res) => {
-        const { quizId } = req.params;
-
         const answers = req.body.answers;
 
         if (!isAnswerMap(answers)) {
           throw ApiError.invalidRequest(`Invalid answer map.`);
         }
 
-        const stats = await quizdb.correctAnswers(quizId, answers);
+        const stats = await quizdb.correctAnswers(answers);
 
         res.status(Status.OK).send({
           ...stats
@@ -187,15 +270,10 @@ export default function defineRoutes(
     );
 
     unauthenticated.get(
-      "/:id",
-      cache(
-        r => (r.params.id ? `quizById(${r.params.id})` : `quizById`),
-        redis
-      ),
-      asyncify(async (req, res) => {
-        const { id } = req.params;
-
-        const quiz = await quizdb.getQuiz(id);
+      "/web-client",
+      cache(r => (r.params.id ? `quizById(${r.params.id})` : `quizById`), redis),
+      asyncify(async (_, res) => {
+        const quiz = await quizdb.getQuiz();
 
         const cachedRes = cacheResult(res, redis);
 

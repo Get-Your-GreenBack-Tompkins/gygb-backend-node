@@ -3,9 +3,11 @@ import { V1DB } from "../db";
 import { ApiError } from "../../api/util";
 
 import { Quiz, isQuizDocument } from "./models/quiz";
-import { isAnswerDocument, AnswerDoc, Answer, isAnswer } from "./models/answer";
+import { Answer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
 import { RichText } from "./models/richtext";
+import { Raffle, isRaffleQueryDocument } from "./models/raffle";
+import { Tutorial } from "./models/tutorial";
 
 export enum QuizCollection {
   QUESTIONS = "questions"
@@ -20,36 +22,329 @@ export class QuizError {
   }
 }
 
-export class QuizDB {
-  private db: V1DB;
+const quizzes = new Map<string, QuizDB>();
 
-  constructor(db: V1DB) {
-    this.db = db;
+export function registerQuizDB(db: V1DB, quizId: string) {
+  const quiz = new QuizDB(db, quizId);
+  
+  quizzes.set(quizId, quiz);
+
+  return quiz;
+}
+
+export function getQuizDB(quizId: string): QuizDB | null {
+  return quizzes.get(quizId) || null;
+}
+
+export async function queryQuiz(quizId: string, db: V1DB): Promise<Quiz> {
+  const quizDoc = await db.quiz().doc(quizId);
+
+  const quizData = await quizDoc.get();
+  const questionCollection = await quizDoc.collection(QuizCollection.QUESTIONS).listDocuments();
+
+  const unresolvedQuestions = questionCollection.map(async d => {
+    const questionDoc = await d.get();
+
+    if (!isQuestionDocument(questionDoc)) {
+      throw ApiError.internalError(`Invalid question document ${d.id} in quiz ${quizId}`);
+    }
+
+    const question = Question.fromDatastore(questionDoc.id, questionDoc.data());
+
+    return question;
+  });
+
+  const questions = await Promise.all(unresolvedQuestions);
+
+  if (!isQuizDocument(quizData)) {
+    throw ApiError.internalError(`Invalid quiz document (${quizId})`);
   }
 
-  async getQuestion(id: string, questionId: string): Promise<Question> {
-    const quizDoc = await this.db.quiz().doc(id);
+  const quiz = Quiz.fromDatastore(quizData.id, quizData.data())(questions);
 
-    const questionDoc = quizDoc
-      .collection(QuizCollection.QUESTIONS)
-      .doc(questionId);
+  return quiz;
+}
+
+type Subscription = (() => void) | null;
+
+export class QuizDB {
+  private db: V1DB;
+  private quizId: string;
+  private quiz: Quiz;
+
+  constructor(db: V1DB, quizId: string) {
+    this.db = db;
+    this.quizId = quizId;
+  }
+
+  getQuiz(): Quiz {
+    return this.quiz;
+  }
+
+  async getTutorial(): Promise<Tutorial> {
+    const quiz = await this.getQuiz();
+    
+    return quiz.tutorial;
+  }
+
+  async listen() {
+    const { quizId, db } = this;
+    this._questionListen();
+    this._quizListen();
+
+    const quiz = await queryQuiz(quizId, db);
+    this.quiz = quiz;
+  }
+
+  _questionsSubscription: Subscription = null;
+
+  _questionListen() {
+    const { quizId, db } = this;
+    if (this._questionsSubscription) {
+      this._questionsSubscription();
+      this._questionsSubscription = null;
+    }
+
+    // Listen for question changes.
+    this._questionsSubscription = this.db
+      .quiz()
+      .doc(quizId)
+      .collection("questions")
+      .onSnapshot(
+        () => {
+          queryQuiz(quizId, db)
+            .then(quiz => {
+              console.log(`Updating quiz: ${quizId}`);
+              this.quiz = quiz;
+            })
+            .catch(err => console.log(err));
+        },
+        error => {
+          console.error(error);
+
+          console.log("Restarting question listeners...");
+          this._questionsSubscription = null;
+          this._questionListen();
+        }
+      );
+  }
+
+  _quizSubscription: Subscription = null;
+
+  _quizListen() {
+    const { quizId, db } = this;
+    if (this._quizSubscription) {
+      this._quizSubscription();
+      this._quizSubscription = null;
+    }
+
+    // Listen for quiz changes.
+    this._quizSubscription = this.db
+      .quiz()
+      .doc(quizId)
+      .onSnapshot(
+        doc => {
+          queryQuiz(doc.id, db)
+            .then(quiz => {
+              console.log(`Updating quiz: ${quizId}`);
+              this.quiz = quiz;
+            })
+            .catch(err => console.log(err));
+        },
+        error => {
+          console.error(error);
+
+          console.log("Restarting quiz listeners...");
+          this._quizSubscription = null;
+          this._quizListen();
+        }
+      );
+  }
+
+  _raffle: Raffle | null = null;
+  _raffleSubscription: Subscription = null;
+  _raffleMonth: number = -1;
+  _raffleYear: number = -1;
+
+  async getCurrentRaffle() {
+    const { quizId } = this;
+
+    const currentDate = new Date();
+
+    let currentMonth = currentDate.getUTCMonth();
+    let currentYear = currentDate.getUTCFullYear();
+
+    let startDate = new Date();
+    startDate.setUTCFullYear(currentYear, currentMonth, 1);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    let endDate = new Date();
+    endDate.setUTCFullYear(currentYear, currentMonth + 1, 1);
+    endDate.setUTCHours(23, 59, 59, 0);
+
+    if (currentMonth !== this._raffleMonth || currentYear !== this._raffleYear) {
+      if (this._raffleSubscription) {
+        this._raffleSubscription();
+      }
+
+      this._raffle = null;
+    }
+
+    if (this._raffle) {
+      return this._raffle;
+    }
+
+    const potentialRaffles = await this.db
+      .quiz()
+      .doc(quizId)
+      .collection("raffles")
+      .where("month", ">=", startDate)
+      .where("month", "<", endDate)
+      .get();
+
+    if (potentialRaffles.size == 0) {
+      console.log("none found :(");
+      this._raffle = null;
+      return null;
+    }
+
+    if (potentialRaffles.size > 1) {
+      throw new Error("Somehow we have multiple raffles in a single month. This should not occur.");
+    }
+
+    const [raffleDoc] = potentialRaffles.docs;
+
+    if (!isRaffleQueryDocument(raffleDoc)) {
+      throw new Error("Invalid raffle document found.");
+    }
+
+    const raffle = Raffle.fromDatastore(raffleDoc.id, raffleDoc.data());
+
+    if (this._raffleSubscription) {
+      this._raffleSubscription();
+      this._raffleSubscription = null;
+    }
+
+    this._raffleSubscription = this.db
+      .quiz()
+      .doc(quizId)
+      .collection("raffles")
+      .where("month", ">=", startDate)
+      .where("month", "<", endDate)
+      .onSnapshot(
+        potentialRaffles => {
+          if (potentialRaffles.size == 0) {
+            this._raffle = null;
+            return;
+          }
+
+          if (potentialRaffles.size > 1) {
+            throw new Error("Somehow we have multiple raffles in a single month. This should not occur.");
+          }
+
+          const [raffleDoc] = potentialRaffles.docs;
+
+          if (!isRaffleQueryDocument(raffleDoc)) {
+            throw new Error("Invalid raffle document found.");
+          }
+
+          const raffle = Raffle.fromDatastore(raffleDoc.id, raffleDoc.data());
+
+          this._raffle = raffle;
+        },
+        error => console.error(error)
+      );
+
+    this._raffle = raffle;
+    this._raffleMonth = startDate.getUTCMonth();
+    this._raffleYear = startDate.getUTCFullYear();
+
+    return raffle;
+  }
+
+  async addToRaffle({
+    raffleId,
+    firstName,
+    lastName,
+    email
+  }: {
+    raffleId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  }) {
+    const { quizId } = this;
+    const subscribers = this.db
+      .quiz()
+      .doc(quizId)
+      .collection("raffles")
+      .doc(raffleId)
+      .collection("subscribers");
+
+    const num = (await subscribers.where("email", "==", email.trim()).get()).size;
+
+    if (num !== 0) {
+      throw ApiError.invalidRequest(`Email ${email} already is subscribed to the raffle.`);
+    }
+
+    return (
+      await subscribers.add({
+        firstName,
+        lastName,
+        email
+      })
+    ).id;
+  }
+
+  async newRaffle(prize: string, requirement: number): Promise<string> {
+    const { quizId } = this;
+
+    if (await this.getCurrentRaffle()) {
+      throw new Error("A raffle already exists!");
+    }
+
+    const currentDate = new Date();
+
+    let currentMonth = currentDate.getUTCMonth();
+    let currentYear = currentDate.getUTCFullYear();
+
+    let startDate = new Date();
+    startDate.setUTCFullYear(currentYear, currentMonth, 1);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const raffleDoc = this.db
+      .quiz()
+      .doc(quizId)
+      .collection("raffles")
+      .doc();
+
+    const raffle = new Raffle({ id: raffleDoc.id, prize, requirement, month: startDate });
+
+    await raffleDoc.set(raffle.toDatastore());
+
+    return raffleDoc.id;
+  }
+
+  async getQuestion(questionId: string): Promise<Question> {
+    const { quizId } = this;
+
+    const quizDoc = await this.db.quiz().doc(quizId);
+
+    const questionDoc = quizDoc.collection(QuizCollection.QUESTIONS).doc(questionId);
     const questionData = await questionDoc.get();
 
     if (!isQuestionDocument(questionData)) {
-      throw ApiError.internalError(
-        `Invalid question (${questionId}) in quiz (${id})!`
-      );
+      throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
     }
 
-    const question = Question.fromDatastore(
-      questionData.id,
-      questionData.data()
-    );
+    const question = Question.fromDatastore(questionData.id, questionData.data());
 
     return question;
   }
 
-  async deleteQuestion(quizId: string, questionId: string) {
+  async deleteQuestion(questionId: string) {
+    const { quizId } = this;
+
     const quizDoc = await this.db.quiz().doc(quizId);
 
     const result = quizDoc.collection(QuizCollection.QUESTIONS);
@@ -57,7 +352,9 @@ export class QuizDB {
     await result.doc(questionId).delete();
   }
 
-  async addQuestion(quizId: string) {
+  async addQuestion() {
+    const { quizId } = this;
+
     const quizDoc = await this.db.quiz().doc(quizId);
     const quizData = await quizDoc.get();
 
@@ -84,17 +381,16 @@ export class QuizDB {
     await document.set(question.toDatastore());
   }
 
-  async correctAnswers(
-    quizId: string,
-    answers: { [questionId: string]: number }
-  ): Promise<{
+  async correctAnswers(answers: {
+    [questionId: string]: number;
+  }): Promise<{
     correct: number;
     incorrect: number;
     total: number;
   }> {
     const correct = await Promise.all(
       Object.keys(answers).map(async questionId => {
-        return this.isCorrect(quizId, questionId, answers[questionId]);
+        return this.isCorrect(questionId, answers[questionId]);
       })
     );
 
@@ -118,17 +414,12 @@ export class QuizDB {
     return stats;
   }
 
-  async isCorrect(
-    quizId: string,
-    questionId: string,
-    answerId: number
-  ): Promise<boolean> {
-    const question = await this.getQuestion(quizId, questionId);
+  async isCorrect(questionId: string, answerId: number): Promise<boolean> {
+    const { quizId } = this;
+    const question = await this.getQuestion(questionId);
 
     if (!question) {
-      throw ApiError.notFound(
-        `No question found for ID ${questionId} in Quiz ${quizId}`
-      );
+      throw ApiError.notFound(`No question found for ID ${questionId} in Quiz ${quizId}`);
     }
 
     const { correct } = question.answers.find(a => a.id === answerId);
@@ -136,18 +427,15 @@ export class QuizDB {
     return correct;
   }
 
-  async addAnswer(quizId: string, questionId: string): Promise<number> {
+  async addAnswer(questionId: string): Promise<number> {
+    const { quizId } = this;
     const quizDoc = await this.db.quiz().doc(quizId);
-    const result = await quizDoc
-      .collection(QuizCollection.QUESTIONS)
-      .doc(questionId);
+    const result = await quizDoc.collection(QuizCollection.QUESTIONS).doc(questionId);
 
     const doc = await result.get();
 
     if (!isQuestionDocument(doc)) {
-      throw ApiError.internalError(
-        `Invalid question (${questionId}) in quiz (${quizId})!`
-      );
+      throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
     }
 
     const question = Question.fromDatastore(result.id, doc.data());
@@ -167,15 +455,15 @@ export class QuizDB {
     return nextId;
   }
 
-  async deleteAnswer(quizId: string, questionId: string, answerId: number) {
+  async deleteAnswer(questionId: string, answerId: number) {
+    const { quizId } = this;
+
     const quizDoc = await this.db.quiz().doc(quizId);
     const result = await quizDoc.collection("questions").doc(questionId);
     const doc = await result.get();
 
     if (!isQuestionDocument(doc)) {
-      throw ApiError.internalError(
-        `Invalid question (${questionId}) in quiz (${quizId})!`
-      );
+      throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
     }
 
     const question = Question.fromDatastore(result.id, doc.data());
@@ -193,7 +481,8 @@ export class QuizDB {
     await result.set(question.toDatastore());
   }
 
-  async updateQuestion(quizId: string, question: Question): Promise<number> {
+  async updateQuestion(question: Question): Promise<number> {
+    const { quizId } = this;
     const quizDoc = await this.db.quiz().doc(quizId);
 
     const { header, body, order, answers } = question.toDatastore();
@@ -207,41 +496,5 @@ export class QuizDB {
       });
 
     return result.writeTime.nanoseconds;
-  }
-
-  async getQuiz(id: string): Promise<Quiz> {
-    const quizDoc = await this.db.quiz().doc(id);
-
-    const quizData = await quizDoc.get();
-    const questionCollection = await quizDoc
-      .collection(QuizCollection.QUESTIONS)
-      .listDocuments();
-
-    const unresolvedQuestions = questionCollection.map(async d => {
-      const questionDoc = await d.get();
-
-      if (!isQuestionDocument(questionDoc)) {
-        throw ApiError.internalError(
-          `Invalid question document ${d.id} in quiz ${id}`
-        );
-      }
-
-      const question = Question.fromDatastore(
-        questionDoc.id,
-        questionDoc.data()
-      );
-
-      return question;
-    });
-
-    const questions = await Promise.all(unresolvedQuestions);
-
-    if (!isQuizDocument(quizData)) {
-      throw ApiError.internalError(`Invalid quiz document (${id})`);
-    }
-
-    const quiz = Quiz.fromDatastore(quizData.id, quizData.data())(questions);
-
-    return quiz;
   }
 }
