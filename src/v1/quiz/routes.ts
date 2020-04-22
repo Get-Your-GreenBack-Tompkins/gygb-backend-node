@@ -37,6 +37,17 @@ export default async function defineRoutes(
     // Enable authentication
     authenticated.use(auth);
 
+    authenticated.put(
+      "/web-client/raffle",
+      asyncify(async (req, res) => {
+        const { prize, requirement } = req.body;
+
+        const id = await quizdb.newRaffle(prize, requirement);
+
+        res.status(Status.OK).send({ id });
+      })
+    );
+
     authenticated.delete(
       "/web-client/question/:questionId/",
       asyncify(async (req, res) => {
@@ -187,17 +198,6 @@ export default async function defineRoutes(
             message: "You did score high enough to entry the lottery!"
           });
         }
-      })
-    );
-
-    unauthenticated.put(
-      "/web-client/raffle",
-      asyncify(async (req, res) => {
-        const { prize, requirement } = req.body;
-
-        const id = await quizdb.newRaffle(prize, requirement);
-
-        res.status(Status.OK).send({ id });
       })
     );
 
