@@ -3,7 +3,8 @@ import firebase from "./firebase";
 export enum Collection {
   USERS = "users",
   QUIZ = "quiz",
-  ADMINS = "admins"
+  ADMINS = "admins",
+  SESSIONS = "sessions"
 }
 
 export class GreenBackDB {
@@ -27,5 +28,9 @@ export class GreenBackDB {
 
   quiz() {
     return this._db.collection(Collection.QUIZ);
+  }
+
+  sessions() {
+    return this._db.collection(Collection.SESSIONS);
   }
 }

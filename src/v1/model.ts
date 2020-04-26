@@ -1,5 +1,5 @@
 // This type represents all valid json.
-export type json = string | number | boolean | null | json[] | { [key in string | number]: json };
+export type json = string | number | boolean | null | json[] | { [key in string | number]: json } | Date;
 
 export type Json = { toJSON(): Json | json } | { [key in string | number]: Json | json } | Json[];
 
