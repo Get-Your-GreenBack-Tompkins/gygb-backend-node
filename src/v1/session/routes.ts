@@ -25,7 +25,7 @@ export default function defineRoutes(
     asyncify(async (req, res) => {
       const { body } = req;
 
-      const created = await sessiondb.createSession(body);
+      const created = await sessiondb.createSession({ ...body, startTime: new Date(body.startTime) });
 
       if (created) {
         res.status(Status.OK).send(created.id);
@@ -41,7 +41,9 @@ export default function defineRoutes(
     asyncify(async (req, res) => {
       const { body } = req;
 
-      const updated = await sessiondb.updateSession(body);
+      console.log("REQUEST RECEIVED");
+
+      const updated = await sessiondb.updateSession({ ...body, endTime: new Date(body.endTime) });
 
       if (updated) {
         res.send(Status.OK);
