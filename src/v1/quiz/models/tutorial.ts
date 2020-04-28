@@ -1,4 +1,4 @@
-import { RichText, RichTextData, isRichTextData } from "./richtext";
+import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
 
 import Delta from "quill-delta";
 
@@ -74,7 +74,7 @@ export class Tutorial {
     return q;
   }
 
-  static fromJSON(id: TutorialId, data: TutorialEdit): Tutorial {
+  static fromJSON(data: TutorialEdit): Tutorial {
     const { header, body } = data;
 
     const q = new Tutorial({

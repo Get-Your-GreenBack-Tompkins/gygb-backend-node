@@ -1,7 +1,7 @@
 import { Model } from "../../model";
 
 import { Question, QuestionDoc } from "./question";
-import { TutorialDoc, isTutorialDocument, Tutorial } from "./tutorial";
+import { TutorialDoc, isTutorialDocument, Tutorial, isTutorialEdit } from "./tutorial";
 
 export type QuizId = string;
 export type QuizDoc = {
@@ -9,6 +9,12 @@ export type QuizDoc = {
   name: string;
   tutorial: TutorialDoc;
   questions: QuestionDoc[];
+};
+
+export type QuizJson = {
+  questionCount: number;
+  name: string;
+  tutorial: { header: string; body: string };
 };
 
 export function isQuizQueryDocument(
@@ -42,6 +48,21 @@ export function isQuizDocument(
     typeof data.questionCount === "number" &&
     "tutorial" in data &&
     isTutorialDocument(data.tutorial)
+  );
+}
+
+export function isQuizEdit(data: unknown): data is QuizJson {
+  const asEdit = data as QuizJson;
+
+  return (
+    data &&
+    typeof data === "object" &&
+    "name" in asEdit &&
+    typeof asEdit.name === "string" &&
+    "questionCount" in asEdit &&
+    typeof asEdit.questionCount === "number" &&
+    "tutorial" in asEdit &&
+    isTutorialEdit(asEdit.tutorial)
   );
 }
 
@@ -87,7 +108,7 @@ export class Quiz extends Model {
     this.tutorial = tutorial;
   }
 
-  toJSON() {
+  toRandomizedJSON() {
     const { id, questions, name, questionCount, tutorial } = this;
 
     const length = Math.min(questions.length, questionCount);
@@ -104,6 +125,32 @@ export class Quiz extends Model {
       questions: randomQuestions,
       tutorial
     };
+  }
+
+  toJSON() {
+    const { id, questions, name, questionCount, tutorial } = this;
+
+    return {
+      id,
+      name,
+      questionCount,
+      questions: questions.sort((a, b) => a.id.localeCompare(b.id)),
+      tutorial
+    };
+  }
+
+  static fromJSON(id: string, quizJson: QuizJson): Quiz {
+    const { name, questionCount, tutorial } = quizJson;
+
+    const quiz = new Quiz({
+      id,
+      questions: [],
+      questionCount,
+      name,
+      tutorial: Tutorial.fromJSON(tutorial)
+    });
+
+    return quiz;
   }
 
   static fromDatastore(id: string, quizDoc: QuizDoc): (questions: Question[]) => Quiz {

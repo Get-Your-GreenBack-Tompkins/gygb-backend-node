@@ -5,7 +5,7 @@ import { ApiError } from "../../api/util";
 import { Quiz, isQuizDocument } from "./models/quiz";
 import { Answer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
-import { RichText } from "./models/richtext";
+import { RichText } from "../models/richtext";
 import { Raffle, isRaffleQueryDocument } from "./models/raffle";
 import { Tutorial } from "./models/tutorial";
 
@@ -26,7 +26,7 @@ const quizzes = new Map<string, QuizDB>();
 
 export function registerQuizDB(db: V1DB, quizId: string) {
   const quiz = new QuizDB(db, quizId);
-  
+
   quizzes.set(quizId, quiz);
 
   return quiz;
@@ -83,7 +83,7 @@ export class QuizDB {
 
   async getTutorial(): Promise<Tutorial> {
     const quiz = await this.getQuiz();
-    
+
     return quiz.tutorial;
   }
 
@@ -390,13 +390,13 @@ export class QuizDB {
   }> {
     const correct = await Promise.all(
       Object.keys(answers).map(async questionId => {
-        return this.isCorrect(questionId, answers[questionId]);
+        return this.getAnswer(questionId, answers[questionId]);
       })
     );
 
     const stats = correct.reduce(
       (prev, next) => {
-        if (next) {
+        if (next && next.correct) {
           prev.correct += 1;
         } else {
           prev.incorrect += 1;
@@ -414,7 +414,7 @@ export class QuizDB {
     return stats;
   }
 
-  async isCorrect(questionId: string, answerId: number): Promise<boolean> {
+  async getAnswer(questionId: string, answerId: number): Promise<Answer | null> {
     const { quizId } = this;
     const question = await this.getQuestion(questionId);
 
@@ -422,9 +422,9 @@ export class QuizDB {
       throw ApiError.notFound(`No question found for ID ${questionId} in Quiz ${quizId}`);
     }
 
-    const { correct } = question.answers.find(a => a.id === answerId);
+    const answer = question.answers.find(a => a.id === answerId);
 
-    return correct;
+    return answer || null;
   }
 
   async addAnswer(questionId: string): Promise<number> {
@@ -494,6 +494,20 @@ export class QuizDB {
       .set(update, {
         mergeFields: ["body", "header", "order", "answers"]
       });
+
+    return result.writeTime.nanoseconds;
+  }
+
+  async updateQuiz(quiz: Quiz): Promise<number> {
+    const { quizId } = this;
+    const quizDoc = await this.db.quiz().doc(quizId);
+
+    const { name, questionCount, tutorial } = quiz.toDatastore();
+    const update = { name, questionCount, tutorial };
+
+    const result = await quizDoc.set(update, {
+      mergeFields: ["name", "questionCount", "tutorial"]
+    });
 
     return result.writeTime.nanoseconds;
   }
