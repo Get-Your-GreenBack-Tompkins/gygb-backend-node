@@ -1,6 +1,6 @@
 import { Model } from "../../model";
 
-import { RichText, RichTextData, isRichTextData } from "./richtext";
+import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
 import {
   Answer,
   AnswerDoc,

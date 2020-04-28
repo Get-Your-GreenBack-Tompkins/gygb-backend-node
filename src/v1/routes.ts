@@ -1,17 +1,17 @@
 import * as express from "express";
 
-import { Redis } from "ioredis";
-
 import { GreenBackDB } from "../db";
 
 import userRoutes from "./user/routes";
 import quizRoutes from "./quiz/routes";
+import tosRoutes from "./tos/routes";
 
-export default async function defineRoutes(db: GreenBackDB, auth: express.RequestHandler, redis?: Redis) {
+export default async function defineRoutes(db: GreenBackDB, auth: express.RequestHandler) {
   const app = express.Router();
 
-  app.use("/user/", await userRoutes(db, auth, redis));
-  app.use("/quiz/", await quizRoutes(db, auth, redis));
+  app.use("/user/", await userRoutes(db, auth));
+  app.use("/quiz/", await quizRoutes(db, auth));
+  app.use("/tos/", await tosRoutes(db, auth));
 
   return app;
 }
