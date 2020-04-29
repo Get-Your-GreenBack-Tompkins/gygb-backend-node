@@ -222,7 +222,8 @@ export default async function defineRoutes(
       // TODO Cache
       asyncify(async (_, res) => {
         const tutorial = await quizdb.getTutorial();
-        const numOfQuestions = await quizdb.getQuiz().questionCount;
+        const quiz = await quizdb.getQuiz();
+        const numOfQuestions = Math.min(quiz.questionCount, quiz.questions.length);
 
         res.status(Status.OK).send({
           ...tutorial,
@@ -240,7 +241,9 @@ export default async function defineRoutes(
           return res.status(Status.NOT_FOUND).send(null);
         }
 
-        const numberOfQuestions = (await quizdb.getQuiz()).questionCount;
+        const quiz = await quizdb.getQuiz();
+
+        const numberOfQuestions = Math.min(quiz.questionCount, quiz.questions.length);
 
         return res.status(Status.OK).send({
           questionRequirement: Math.floor(raffle.requirement * numberOfQuestions),
@@ -311,21 +314,16 @@ export default async function defineRoutes(
           return res.status(Status.BAD_REQUEST).send({ message: "Invalid answer ID passed." });
         }
 
-        const correct = await quizdb.getAnswer(questionId, id);
+        const answer = await quizdb.getAnswer(questionId, id);
 
-        if (correct && correct.correct) {
+        if (answer) {
+          const { correct, message } = answer;
+
           res.status(Status.OK).send({
             questionId,
             answerId,
             correct,
-            message: correct.message
-          });
-        } else if (correct) {
-          res.status(Status.OK).send({
-            questionId,
-            answerId,
-            correct,
-            message: correct.message
+            message
           });
         } else {
           throw ApiError.notFound("No such answer found.");
