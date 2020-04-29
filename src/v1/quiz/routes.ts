@@ -6,6 +6,7 @@ import { Redis } from "ioredis";
 import { ApiError } from "../../api/util";
 import { cache, cacheResult } from "../../middleware/cache";
 import { asyncify } from "../../middleware/async";
+import { secureRandomNumber } from "../../lib/random";
 
 import { V1DB } from "../db";
 
@@ -41,7 +42,7 @@ export default async function defineRoutes(
     authenticated.get(
       "/web-client/edit",
       asyncify(async (_, res) => {
-        const quiz = await quizdb.getQuiz();
+        const quiz = await quizdb.getQuizNoCache();
 
         if (quiz) {
           res.status(Status.OK).json(quiz.toJSON());
@@ -74,11 +75,56 @@ export default async function defineRoutes(
     authenticated.put(
       "/web-client/raffle",
       asyncify(async (req, res) => {
-        const { prize, requirement } = req.body;
+        const { prize, questionRequirement } = req.body;
 
-        const id = await quizdb.newRaffle(prize, requirement);
+        if (!prize || !questionRequirement) {
+          throw ApiError.invalidRequest("Invalid raffle request body.");
+        }
+
+        const id = await quizdb.newRaffle(prize, questionRequirement);
 
         res.status(Status.OK).send({ id });
+      })
+    );
+
+    authenticated.get(
+      "/web-client/raffle/winner",
+      asyncify(async (req, res) => {
+        const raffle = await quizdb.getCurrentRaffle();
+
+        if (!raffle) {
+          throw ApiError.notFound("No raffle currently.");
+        }
+
+        const entrants = await quizdb.getRaffleEntrants();
+
+        if (entrants.length === 0) {
+          throw ApiError.internalError("Not enough entrants to find a winner!");
+        }
+
+        const numOfEntrants = entrants.length;
+
+        const winnerIndex = await secureRandomNumber(0, numOfEntrants - 1);
+        const winner = entrants[winnerIndex];
+
+        await quizdb.setRaffleWinner(winner.id);
+
+        const { firstName, lastName, email } = winner;
+
+        res.status(Status.OK).send({
+          firstName,
+          lastName,
+          email
+        });
+      })
+    );
+
+    authenticated.get(
+      "/web-client/raffle/edit",
+      asyncify(async (_, res) => {
+        const raffle = await quizdb.getCurrentRaffle(false);
+
+        res.status(Status.OK).send(raffle.toJSON());
       })
     );
 

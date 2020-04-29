@@ -10,7 +10,12 @@ import { Raffle, isRaffleQueryDocument } from "./models/raffle";
 import { Tutorial } from "./models/tutorial";
 
 export enum QuizCollection {
-  QUESTIONS = "questions"
+  QUESTIONS = "questions",
+  RAFFLES = "raffles"
+}
+
+export enum QuizRaffleCollection {
+  SUBSCRIBERS = "subscribers"
 }
 
 export class QuizError {
@@ -75,6 +80,11 @@ export class QuizDB {
   constructor(db: V1DB, quizId: string) {
     this.db = db;
     this.quizId = quizId;
+  }
+
+  async getQuizNoCache(): Promise<Quiz> {
+    const { quizId } = this;
+    return await queryQuiz(quizId, this.db);
   }
 
   getQuiz(): Quiz {
@@ -166,7 +176,7 @@ export class QuizDB {
   _raffleMonth: number = -1;
   _raffleYear: number = -1;
 
-  async getCurrentRaffle() {
+  async getCurrentRaffle(cache: boolean = true) {
     const { quizId } = this;
 
     const currentDate = new Date();
@@ -190,21 +200,23 @@ export class QuizDB {
       this._raffle = null;
     }
 
-    if (this._raffle) {
+    if (this._raffle && cache) {
       return this._raffle;
     }
 
     const potentialRaffles = await this.db
       .quiz()
       .doc(quizId)
-      .collection("raffles")
+      .collection(QuizCollection.RAFFLES)
       .where("month", ">=", startDate)
       .where("month", "<", endDate)
       .get();
 
     if (potentialRaffles.size == 0) {
       console.log("none found :(");
-      this._raffle = null;
+      if (cache) {
+        this._raffle = null;
+      }
       return null;
     }
 
@@ -220,6 +232,10 @@ export class QuizDB {
 
     const raffle = Raffle.fromDatastore(raffleDoc.id, raffleDoc.data());
 
+    if (!cache) {
+      return raffle;
+    }
+
     if (this._raffleSubscription) {
       this._raffleSubscription();
       this._raffleSubscription = null;
@@ -228,7 +244,7 @@ export class QuizDB {
     this._raffleSubscription = this.db
       .quiz()
       .doc(quizId)
-      .collection("raffles")
+      .collection(QuizCollection.RAFFLES)
       .where("month", ">=", startDate)
       .where("month", "<", endDate)
       .onSnapshot(
@@ -277,9 +293,9 @@ export class QuizDB {
     const subscribers = this.db
       .quiz()
       .doc(quizId)
-      .collection("raffles")
+      .collection(QuizCollection.RAFFLES)
       .doc(raffleId)
-      .collection("subscribers");
+      .collection(QuizRaffleCollection.SUBSCRIBERS);
 
     const num = (await subscribers.where("email", "==", email.trim()).get()).size;
 
@@ -315,7 +331,7 @@ export class QuizDB {
     const raffleDoc = this.db
       .quiz()
       .doc(quizId)
-      .collection("raffles")
+      .collection(QuizCollection.RAFFLES)
       .doc();
 
     const raffle = new Raffle({ id: raffleDoc.id, prize, requirement, month: startDate });
@@ -323,6 +339,52 @@ export class QuizDB {
     await raffleDoc.set(raffle.toDatastore());
 
     return raffleDoc.id;
+  }
+
+  async setRaffleWinner(id: string) {
+    const { quizId } = this;
+    const raffle = await this.getCurrentRaffle();
+    const raffleDoc = await this.db
+      .quiz()
+      .doc(quizId)
+      .collection(QuizCollection.RAFFLES)
+      .doc(raffle.id);
+
+    if (raffle.winner) {
+      throw ApiError.invalidRequest("Raffle already has a winner!");
+    }
+
+    raffleDoc.set(
+      {
+        winner: id
+      },
+      {
+        mergeFields: ["winner"]
+      }
+    );
+  }
+
+  async getRaffleEntrants() {
+    const { quizId } = this;
+    const raffle = await this.getCurrentRaffle();
+    const query = await this.db
+      .quiz()
+      .doc(quizId)
+      .collection(QuizCollection.RAFFLES)
+      .doc(raffle.id)
+      .collection(QuizRaffleCollection.SUBSCRIBERS)
+      .get();
+
+    const entrants = query.docs
+      .map(d => [d.id, d.data()] as const)
+      .map(([id, { firstName, lastName, email }]) => ({
+        id,
+        firstName: firstName as string,
+        lastName: lastName as string,
+        email: email as string
+      }));
+
+    return entrants;
   }
 
   async getQuestion(questionId: string): Promise<Question> {
