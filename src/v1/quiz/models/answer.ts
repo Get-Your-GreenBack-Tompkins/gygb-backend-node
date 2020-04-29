@@ -68,11 +68,12 @@ export class Answer {
   }
 
   toJSON() {
-    const { id, text, correct } = this;
+    const { id, text, correct, message } = this;
     return {
       id,
       text,
-      correct
+      correct,
+      message
     };
   }
 
