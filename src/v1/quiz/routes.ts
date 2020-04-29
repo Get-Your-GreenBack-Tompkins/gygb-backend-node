@@ -11,6 +11,7 @@ import { V1DB } from "../db";
 
 import { registerQuizDB } from "./db";
 import { Question, isQuestionEdit } from "./models/question";
+import { Quiz, isQuizEdit } from "./models/quiz";
 
 function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
   return (
@@ -36,6 +37,39 @@ export default async function defineRoutes(
   function setupAuthenticated(authenticated: express.Router) {
     // Enable authentication
     authenticated.use(auth);
+
+    authenticated.get(
+      "/web-client/edit",
+      asyncify(async (_, res) => {
+        const quiz = await quizdb.getQuiz();
+
+        if (quiz) {
+          res.status(Status.OK).json(quiz.toJSON());
+        } else {
+          res.status(Status.NOT_FOUND).send({ message: "Quiz does not exist!" });
+        }
+      })
+    );
+
+    authenticated.post(
+      "/web-client/edit",
+      asyncify(async (req, res) => {
+        const edit = req.body;
+
+        if (!isQuizEdit(edit)) {
+          throw ApiError.invalidRequest("Not a valid quiz edit.");
+        }
+        console.log(req.body);
+        const quiz = Quiz.fromJSON("web-client", req.body);
+
+        const nanoseconds = await quizdb.updateQuiz(quiz);
+
+        // TODO Remove
+        console.log(`Updated quiz ${nanoseconds} nanoseconds!`);
+
+        res.status(Status.OK).send({ nanoseconds });
+      })
+    );
 
     authenticated.put(
       "/web-client/raffle",
@@ -231,22 +265,24 @@ export default async function defineRoutes(
           return res.status(Status.BAD_REQUEST).send({ message: "Invalid answer ID passed." });
         }
 
-        const correct = await quizdb.isCorrect(questionId, id);
+        const correct = await quizdb.getAnswer(questionId, id);
 
-        if (correct) {
+        if (correct && correct.correct) {
           res.status(Status.OK).send({
             questionId,
             answerId,
             correct,
-            message: "Congrats!"
+            message: correct.message
+          });
+        } else if (correct) {
+          res.status(Status.OK).send({
+            questionId,
+            answerId,
+            correct,
+            message: correct.message
           });
         } else {
-          res.status(Status.OK).send({
-            questionId,
-            answerId,
-            correct,
-            message: "Whoops try again!"
-          });
+          throw ApiError.notFound("No such answer found.");
         }
       })
     );
@@ -278,7 +314,7 @@ export default async function defineRoutes(
         const cachedRes = cacheResult(res, redis);
 
         if (quiz) {
-          cachedRes.send(Status.OK, quiz.toJSON());
+          cachedRes.send(Status.OK, quiz.toRandomizedJSON());
         } else {
           cachedRes.send(Status.NOT_FOUND, { message: "Quiz does not exist!" });
         }

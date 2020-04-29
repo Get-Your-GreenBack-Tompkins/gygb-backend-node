@@ -1,15 +1,17 @@
-import { RichText, RichTextData, isRichTextData } from "./richtext";
+import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
 
 export type AnswerId = string;
 export type AnswerDoc = {
   id: number;
   text: RichTextData;
+  message: string;
   correct: boolean;
 };
 
 export type AnswerEdit = {
   id: number;
   text: string;
+  message: string;
   correct: boolean;
 };
 
@@ -18,6 +20,7 @@ export function isAnswerEdit(data: unknown) {
   return (
     typeof asEdit.id === "number" &&
     typeof asEdit.text === "string" &&
+    typeof asEdit.message === "string" &&
     typeof asEdit.correct === "boolean"
   );
 }
@@ -43,8 +46,9 @@ export class Answer {
   id: number;
   text: RichText;
   correct: boolean;
+  message: string;
 
-  constructor(params: { id: number; text: RichText; correct?: boolean }) {
+  constructor(params: { id: number; text: RichText; correct?: boolean; message?: string }) {
     const { id, text } = params;
 
     this.id = id;
@@ -54,6 +58,12 @@ export class Answer {
       this.correct = params.correct;
     } else {
       this.correct = false;
+    }
+
+    if ("message" in params) {
+      this.message = params.message;
+    } else {
+      this.message = "";
     }
   }
 
@@ -79,20 +89,21 @@ export class Answer {
   }
 
   static fromJSON(data: AnswerEdit): Answer {
-    const { id, text, correct } = data;
+    const { id, text, correct, message } = data;
 
-    const answer = new Answer({ id, text: RichText.fromJSON(text), correct });
+    const answer = new Answer({ id, text: RichText.fromJSON(text), correct, message });
 
     return answer;
   }
 
   static fromDatastore(doc: AnswerDoc): Answer {
-    const { id, text, correct } = doc;
+    const { id, text, correct, message } = doc;
 
     const answer = new Answer({
       id,
       text: RichText.fromDatastore(text),
-      correct
+      correct,
+      message
     });
 
     return answer;
@@ -101,6 +112,7 @@ export class Answer {
   toDatastore(): AnswerDoc {
     return {
       id: this.id,
+      message: this.message,
       text: this.text.toDatastore(),
       correct: this.correct
     };

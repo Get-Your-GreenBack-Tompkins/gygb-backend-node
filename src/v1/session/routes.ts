@@ -41,8 +41,6 @@ export default function defineRoutes(
     asyncify(async (req, res) => {
       const { body } = req;
 
-      console.log("REQUEST RECEIVED");
-
       const updated = await sessiondb.updateSession({ ...body, endTime: new Date(body.endTime) });
 
       if (updated) {

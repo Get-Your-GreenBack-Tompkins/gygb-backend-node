@@ -4,7 +4,8 @@ export enum Collection {
   USERS = "users",
   QUIZ = "quiz",
   ADMINS = "admins",
-  SESSIONS = "sessions"
+  SESSIONS = "sessions",
+  TOS = "tos"
 }
 
 export class GreenBackDB {
@@ -20,6 +21,10 @@ export class GreenBackDB {
 
   admins() {
     return this._db.collection(Collection.ADMINS);
+  }
+
+  tos() {
+    return this._db.collection(Collection.TOS);
   }
 
   users() {
