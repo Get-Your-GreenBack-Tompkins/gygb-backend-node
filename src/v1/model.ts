@@ -1,12 +1,12 @@
 // This type represents all valid json.
-export type json = string | number | boolean | null | json[] | { [key in string | number]: json } | Date;
+export type json = string | number | boolean | null | json[] | { [key in string | number]: json };
 
 export type Json = { toJSON(): Json | json } | { [key in string | number]: Json | json } | Json[];
 
 export type DatastoreJson =
   | json
   | FirebaseFirestore.Timestamp
-  | { [key in string | number]: FirebaseFirestore.Timestamp | json };
+  | { [key in string | number]: FirebaseFirestore.Timestamp | json | Date };
 
 export abstract class Model {
   id: string;
