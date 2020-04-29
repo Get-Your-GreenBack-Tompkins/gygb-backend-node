@@ -213,7 +213,7 @@ export default async function defineRoutes(
         }
 
         if (!isAnswerMap(answers)) {
-          throw ApiError.invalidRequest(`Invalid answer map.`);
+          throw ApiError.invalidRequest("Invalid answer map.");
         }
 
         const stats = await quizdb.correctAnswers(answers);
@@ -294,7 +294,7 @@ export default async function defineRoutes(
         const answers = req.body.answers;
 
         if (!isAnswerMap(answers)) {
-          throw ApiError.invalidRequest(`Invalid answer map.`);
+          throw ApiError.invalidRequest("Invalid answer map.");
         }
 
         const stats = await quizdb.correctAnswers(answers);
@@ -307,7 +307,7 @@ export default async function defineRoutes(
 
     unauthenticated.get(
       "/web-client",
-      cache(r => (r.params.id ? `quizById(${r.params.id})` : `quizById`), redis),
+      cache(r => (r.params.id ? `quizById(${r.params.id})` : "quizById"), redis),
       asyncify(async (_, res) => {
         const quiz = await quizdb.getQuiz();
 

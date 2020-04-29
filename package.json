@@ -19,6 +19,7 @@
     "@types/express": "^4.17.2",
     "@types/ioredis": "^4.14.7",
     "@types/sanitize-html": "^1.20.2",
+    "@types/uuid": "^7.0.3",
     "@types/validator": "^12.0.1",
     "@typescript-eslint/eslint-plugin": "^2.19.2",
     "@typescript-eslint/parser": "^2.19.2",
@@ -35,9 +36,11 @@
     "firebase-admin": "^8.9.2",
     "http-status-codes": "^1.4.0",
     "ioredis": "^4.16.0",
+    "moment": "^2.24.0",
     "quill-delta": "^4.2.1",
     "quill-delta-to-html": "^0.11.0",
     "sanitize-html": "^1.21.1",
+    "uuid": "^7.0.3",
     "validator": "^12.2.0"
   }
 }

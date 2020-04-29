@@ -6,7 +6,7 @@ export type Json = { toJSON(): Json | json } | { [key in string | number]: Json 
 export type DatastoreJson =
   | json
   | FirebaseFirestore.Timestamp
-  | { [key in string | number]: FirebaseFirestore.Timestamp | json };
+  | { [key in string | number]: FirebaseFirestore.Timestamp | json | Date };
 
 export abstract class Model {
   id: string;
