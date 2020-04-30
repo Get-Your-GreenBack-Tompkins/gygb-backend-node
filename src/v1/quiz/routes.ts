@@ -110,7 +110,7 @@ export default async function defineRoutes(
 
         const numOfEntrants = entrants.length;
 
-        const winnerIndex = await secureRandomNumber(0, numOfEntrants - 1);
+        const winnerIndex = numOfEntrants === 1 ? 0 : await secureRandomNumber(0, numOfEntrants - 1);
         const winner = entrants[winnerIndex];
 
         await quizdb.setRaffleWinner(winner);
