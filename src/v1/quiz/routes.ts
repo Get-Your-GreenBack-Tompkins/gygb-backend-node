@@ -85,6 +85,15 @@ export default async function defineRoutes(
     );
 
     authenticated.get(
+      "/web-client/raffle/list",
+      asyncify(async (_, res) => {
+        const raffles = await quizdb.getRafflesNoCache();
+
+        res.status(Status.OK).send({ raffles: raffles.map(r => r.toAuthenticatedJSON()) });
+      })
+    );
+
+    authenticated.get(
       "/web-client/raffle/winner",
       asyncify(async (req, res) => {
         const raffle = await quizdb.getCurrentRaffle();
@@ -104,7 +113,7 @@ export default async function defineRoutes(
         const winnerIndex = await secureRandomNumber(0, numOfEntrants - 1);
         const winner = entrants[winnerIndex];
 
-        await quizdb.setRaffleWinner(winner.id);
+        await quizdb.setRaffleWinner(winner);
 
         const { firstName, lastName, email } = winner;
 

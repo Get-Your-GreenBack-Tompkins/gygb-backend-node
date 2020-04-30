@@ -15,15 +15,17 @@ export type RaffleDoc = {
   prize: string;
   requirement: number;
   month: firebase.firestore.Timestamp;
-  winner?: string;
+  winner?: RaffleEntrant;
 };
+
+export type RaffleEntrant = { id: string; firstName: string; lastName: string; email: string };
 
 export type Unknown<K> = { [k in keyof K]: unknown };
 
-export function isRaffleQueryDocument(
-  doc: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>
-): doc is FirebaseFirestore.QueryDocumentSnapshot<RaffleDoc> {
-  const asQuiz = doc as FirebaseFirestore.QueryDocumentSnapshot<RaffleDoc>;
+export function isRaffleDocument(
+  doc: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.DocumentData>
+): doc is FirebaseFirestore.DocumentSnapshot<RaffleDoc> {
+  const asQuiz = doc as FirebaseFirestore.DocumentSnapshot<RaffleDoc>;
   const data = asQuiz.data();
 
   if (!data) {
@@ -37,13 +39,25 @@ export function isRaffleQueryDocument(
   return hasPrize && hasRequirement && hasDate;
 }
 
+export function isRaffleQueryDocument(
+  doc: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>
+): doc is FirebaseFirestore.QueryDocumentSnapshot<RaffleDoc> {
+  return isRaffleDocument(doc);
+}
+
 export class Raffle extends Model {
   prize: string;
   requirement: number;
   month: Date;
-  winner?: string;
+  winner?: RaffleEntrant;
 
-  constructor(params: { id: string; prize: string; requirement: number; month: Date; winner?: string }) {
+  constructor(params: {
+    id: string;
+    prize: string;
+    requirement: number;
+    month: Date;
+    winner?: RaffleEntrant;
+  }) {
     const { id, prize, requirement, month } = params;
 
     super(id);
@@ -51,7 +65,7 @@ export class Raffle extends Model {
     this.requirement = requirement;
     this.prize = prize;
 
-    if ("winner" in params) {
+    if ("winner" in params && typeof params.winner === "object") {
       this.winner = params.winner;
     }
   }
@@ -67,16 +81,29 @@ export class Raffle extends Model {
   }
 
   static fromDatastore(id: string, data: RaffleDoc): Raffle {
-    const { prize, month, requirement } = data;
+    const { prize, month, requirement, winner } = data;
 
     const r = new Raffle({
       id,
       prize,
       requirement,
+      winner,
       month: month.toDate()
     });
 
     return r;
+  }
+
+  toAuthenticatedJSON() {
+    const { id, month, requirement, prize, winner = null } = this;
+
+    return {
+      id,
+      prize,
+      requirement,
+      winner,
+      month: month.toISOString()
+    };
   }
 
   toJSON() {
