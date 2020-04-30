@@ -28,7 +28,7 @@ export function renderDeltaString(delta: string) {
 
   // We'll start with a quite restrictive subset of HTML.
   const opts = {
-    allowedTags: ["b", "i", "em", "strong", "a"],
+    allowedTags: ["b", "i", "em", "strong", "a", "ul", "li", "br"],
     allowedAttributes: {
       a: ["href"]
     }
