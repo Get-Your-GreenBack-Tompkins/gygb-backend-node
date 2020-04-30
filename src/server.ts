@@ -18,7 +18,7 @@ export default async function serve(
   app.use(cors({ origin: "*" }));
   app.options("*", cors({ origin: "*" }));
 
-  const auth = initializeAuth(db);
+  const auth = initializeAuth();
 
   app.use("/v1/", await v1(db, auth));
 

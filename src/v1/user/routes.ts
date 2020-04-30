@@ -3,8 +3,6 @@ import * as Status from "http-status-codes";
 
 import isEmail from "validator/lib/isEmail";
 
-import { Redis } from "ioredis";
-
 import { asyncify } from "../../middleware/async";
 
 import { V1DB } from "../db";
@@ -15,21 +13,13 @@ import { UserSource } from "./models/user";
 function hasEmail(x: unknown): x is { email: string } {
   const asEmail = x as { email: string };
 
-  return (
-    typeof x === "object" &&
-    "email" in asEmail &&
-    typeof asEmail.email === "string"
-  );
+  return typeof x === "object" && "email" in asEmail && typeof asEmail.email === "string";
 }
 
 function hasMarketing(x: unknown): x is { marketing: boolean } {
   const asMarketing = x as { marketing: boolean };
 
-  return (
-    typeof x === "object" &&
-    "marketing" in asMarketing &&
-    typeof asMarketing.marketing === "boolean"
-  );
+  return typeof x === "object" && "marketing" in asMarketing && typeof asMarketing.marketing === "boolean";
 }
 
 function hasSource(x: unknown): x is { source: UserSource } {
@@ -43,11 +33,7 @@ function hasSource(x: unknown): x is { source: UserSource } {
   );
 }
 
-export default function defineRoutes(
-  db: V1DB,
-  auth: express.RequestHandler,
-  _?: Redis
-): express.Router {
+export default function defineRoutes(db: V1DB, auth: express.RequestHandler): express.Router {
   const router = express.Router();
 
   const userdb = new UserDB(db);
@@ -93,9 +79,7 @@ export default function defineRoutes(
       const { marketing, email, source } = body;
 
       if (!isEmail(email)) {
-        return res
-          .status(Status.BAD_REQUEST)
-          .send({ message: "Invalid Email" });
+        return res.status(Status.BAD_REQUEST).send({ message: "Invalid Email" });
       }
 
       const user = await userdb.getUser(body.email);
@@ -111,9 +95,7 @@ export default function defineRoutes(
 
         return res.status(Status.OK).send(created.toJSON());
       } else {
-        return res
-          .status(Status.BAD_REQUEST)
-          .send({ message: "User already exists." });
+        return res.status(Status.BAD_REQUEST).send({ message: "User already exists." });
       }
     })
   );
