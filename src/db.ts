@@ -19,10 +19,6 @@ export class GreenBackDB {
     return this._db;
   }
 
-  admins() {
-    return this._db.collection(Collection.ADMINS);
-  }
-
   tos() {
     return this._db.collection(Collection.TOS);
   }

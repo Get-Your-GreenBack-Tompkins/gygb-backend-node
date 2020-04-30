@@ -6,6 +6,7 @@ import userRoutes from "./user/routes";
 import quizRoutes from "./quiz/routes";
 import sessionRoutes from "./session/routes";
 import tosRoutes from "./tos/routes";
+import adminRoutes from "./admin/routes";
 
 export default async function defineRoutes(db: GreenBackDB, auth: express.RequestHandler) {
   const app = express.Router();
@@ -14,6 +15,7 @@ export default async function defineRoutes(db: GreenBackDB, auth: express.Reques
   app.use("/quiz/", await quizRoutes(db, auth));
   app.use("/session/", await sessionRoutes(db, auth));
   app.use("/tos/", await tosRoutes(db, auth));
+  app.use("/admin/", await adminRoutes(auth));
 
   return app;
 }

@@ -1,21 +1,13 @@
 import * as express from "express";
 import * as Status from "http-status-codes";
 
-import isEmail from "validator/lib/isEmail";
-
-import { Redis } from "ioredis";
-
 import { asyncify } from "../../middleware/async";
 
 import { V1DB } from "../db";
 
 import { SessionDB } from "./db";
 
-export default function defineRoutes(
-  db: V1DB,
-  auth: express.RequestHandler,
-  _?: Redis
-): express.Router {
+export default function defineRoutes(db: V1DB, auth: express.RequestHandler): express.Router {
   const router = express.Router();
 
   const sessiondb = new SessionDB(db);
@@ -29,8 +21,7 @@ export default function defineRoutes(
 
       if (created) {
         res.status(Status.OK).send(created.id);
-      }
-      else {
+      } else {
         res.send(Status.BAD_REQUEST);
       }
     })
@@ -45,8 +36,7 @@ export default function defineRoutes(
 
       if (updated) {
         res.send(Status.OK);
-      }
-      else {
+      } else {
         res.send(Status.BAD_REQUEST);
       }
     })

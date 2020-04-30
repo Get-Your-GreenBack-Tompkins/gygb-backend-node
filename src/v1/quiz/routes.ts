@@ -1,8 +1,6 @@
 import * as express from "express";
 import * as Status from "http-status-codes";
 
-import { Redis } from "ioredis";
-
 import { ApiError } from "../../api/util";
 import { cache, cacheResult } from "../../middleware/cache";
 import { asyncify } from "../../middleware/async";
@@ -24,8 +22,7 @@ function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
 
 export default async function defineRoutes(
   db: V1DB,
-  auth: express.RequestHandler,
-  redis?: Redis
+  auth: express.RequestHandler
 ): Promise<express.Router> {
   const quizdb = registerQuizDB(db, "web-client");
 
@@ -223,7 +220,6 @@ export default async function defineRoutes(
   function setupUnauthenticated(unauthenticated: express.Router) {
     unauthenticated.get(
       "/web-client/tutorial",
-      // TODO Cache
       asyncify(async (_, res) => {
         const tutorial = await quizdb.getTutorial();
         const quiz = await quizdb.getQuiz();
@@ -337,7 +333,6 @@ export default async function defineRoutes(
 
     unauthenticated.post(
       "/web-client/verify",
-      // TODO Cache
       asyncify(async (req, res) => {
         const answers = req.body.answers;
 
@@ -355,11 +350,11 @@ export default async function defineRoutes(
 
     unauthenticated.get(
       "/web-client",
-      cache(r => (r.params.id ? `quizById(${r.params.id})` : "quizById"), redis),
+      cache(r => (r.params.id ? `quizById(${r.params.id})` : "quizById")),
       asyncify(async (_, res) => {
         const quiz = await quizdb.getQuiz();
 
-        const cachedRes = cacheResult(res, redis);
+        const cachedRes = cacheResult(res);
 
         if (quiz) {
           cachedRes.send(Status.OK, quiz.toRandomizedJSON());

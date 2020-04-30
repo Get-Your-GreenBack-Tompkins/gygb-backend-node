@@ -1,57 +1,62 @@
 import { ApiError } from "../../api/util";
 
-import { GreenBackDB } from "../../db";
-
-import { Admin, isAdminQueryDocument } from "./models/admin";
+import firebase from "../../firebase";
+import { auth } from "firebase-admin";
 
 export class AuthDB {
-  private db: GreenBackDB;
+  async addAdmin(email: string) {
+    try {
+      const record = await firebase.auth().getUserByEmail(email);
 
-  constructor(db: GreenBackDB) {
-    this.db = db;
+      await firebase.auth().setCustomUserClaims(record.uid, { admin: true });
+    } catch (err) {
+      console.error(err);
+
+      throw ApiError.notFound("No user was found under that email.");
+    }
   }
 
-  async getAdmin(uid: string): Promise<Admin | null> {
-    const result = await this.db
-      .admins()
-      .where("uid", "==", uid)
-      .get();
+  async removeAdmin(email: string) {
+    const record = await firebase.auth().getUserByEmail(email);
 
-    const len = result.size;
-
-    if (len > 1) {
-      throw ApiError.internalError(
-        "Multiple administrators found with the same UID!"
-      );
-    } else if (len == 0) {
-      return null;
+    if (!record) {
+      throw ApiError.notFound("No user was found under that email.");
     }
 
-    const [adminData] = result.docs;
-
-    if (!isAdminQueryDocument(adminData)) {
-      throw ApiError.internalError(`Invalid admin document for UID: (${uid})!`);
-    }
-
-    const admin = Admin.fromDatastore(adminData.id, adminData.data());
-
-    return admin;
+    await firebase.auth().setCustomUserClaims(record.uid, { admin: false });
   }
 
-  async isAdmin(uid: string): Promise<boolean> {
-    const result = await this.db
-      .admins()
-      .where("uid", "==", uid)
-      .get();
+  async getAdmins(): Promise<string[]> {
+    async function* getAllUsers(initialBatch: auth.ListUsersResult) {
+      yield initialBatch.users;
 
-    const len = result.size;
+      let batch = initialBatch;
 
-    if (len > 1) {
-      throw ApiError.internalError(
-        "Multiple administrators found with the same UID!"
-      );
-    } else {
-      return len !== 0;
+      while (batch.pageToken) {
+        batch = await firebase.auth().listUsers(undefined, batch.pageToken);
+
+        yield batch.users;
+      }
     }
+
+    const users = [];
+
+    const initialBatch = await firebase.auth().listUsers();
+
+    for await (const usersBatch of getAllUsers(initialBatch)) {
+      users.push(
+        ...usersBatch.filter(u => {
+          const claims = u.customClaims as { [key: string]: unknown };
+
+          if (!claims) {
+            return false;
+          }
+
+          return "admin" in claims && claims.admin === true;
+        })
+      );
+    }
+
+    return users.map(u => u.email);
   }
 }
