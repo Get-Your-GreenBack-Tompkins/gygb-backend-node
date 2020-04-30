@@ -56,10 +56,13 @@ export async function queryQuiz(quizId: string, db: V1DB): Promise<Quiz> {
 
     const question = Question.fromDatastore(questionDoc.id, questionDoc.data());
 
+    // Setup creation time for sane sorting in admin panel.
+    question.creationTime = questionDoc.createTime.seconds;
+
     return question;
   });
 
-  const questions = await Promise.all(unresolvedQuestions);
+  const questions = (await Promise.all(unresolvedQuestions)).sort((a, b) => a.creationTime - b.creationTime);
 
   if (!isQuizDocument(quizData)) {
     throw ApiError.internalError(`Invalid quiz document (${quizId})`);
@@ -119,7 +122,7 @@ export class QuizDB {
     this._questionsSubscription = this.db
       .quiz()
       .doc(quizId)
-      .collection("questions")
+      .collection(QuizCollection.QUESTIONS)
       .onSnapshot(
         () => {
           queryQuiz(quizId, db)
@@ -426,17 +429,13 @@ export class QuizDB {
 
     const result = quizDoc.collection(QuizCollection.QUESTIONS);
 
-    const questions = await result.listDocuments();
-    const number = questions.length + 1;
-
     const document = result.doc();
 
     const question = new Question({
       id: document.id,
       answers: [],
       body: new RichText(),
-      header: `Question ${number}`,
-      order: number,
+      header: `New Question`,
       answerId: 0
     });
 
@@ -496,7 +495,7 @@ export class QuizDB {
 
     const doc = await result.get();
 
-    if (!isQuestionDocument(doc)) {
+    if (!doc.exists || !isQuestionDocument(doc)) {
       throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
     }
 
@@ -521,10 +520,10 @@ export class QuizDB {
     const { quizId } = this;
 
     const quizDoc = await this.db.quiz().doc(quizId);
-    const result = await quizDoc.collection("questions").doc(questionId);
+    const result = await quizDoc.collection(QuizCollection.QUESTIONS).doc(questionId);
     const doc = await result.get();
 
-    if (!isQuestionDocument(doc)) {
+    if (!doc.exists || !isQuestionDocument(doc)) {
       throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
     }
 
@@ -547,17 +546,19 @@ export class QuizDB {
     const { quizId } = this;
     const quizDoc = await this.db.quiz().doc(quizId);
 
-    const { header, body, order, answers } = question.toDatastore();
-    const update = { header, body, order, answers };
+    const { header, body, answers } = question.toDatastore();
+    const update = { header, body, answers };
 
-    const result = await quizDoc
-      .collection(QuizCollection.QUESTIONS)
-      .doc(question.id)
-      .set(update, {
-        mergeFields: ["body", "header", "order", "answers"]
+    const result = await quizDoc.collection(QuizCollection.QUESTIONS).doc(question.id);
+
+    if ((await result.get()).exists) {
+      const metrics = await result.set(update, {
+        mergeFields: ["body", "header", "answers"]
       });
+      return metrics.writeTime.nanoseconds;
+    }
 
-    return result.writeTime.nanoseconds;
+    throw ApiError.invalidRequest(`${question.id} is not a valid question in ${quizId}!`);
   }
 
   async updateQuiz(quiz: Quiz): Promise<number> {
