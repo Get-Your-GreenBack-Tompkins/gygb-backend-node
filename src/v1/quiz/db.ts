@@ -6,7 +6,7 @@ import { Quiz, isQuizDocument } from "./models/quiz";
 import { Answer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
 import { RichText } from "../models/richtext";
-import { Raffle, isRaffleQueryDocument } from "./models/raffle";
+import { Raffle, isRaffleQueryDocument, RaffleDoc, isRaffleDocument, RaffleEntrant } from "./models/raffle";
 import { Tutorial } from "./models/tutorial";
 
 export enum QuizCollection {
@@ -281,6 +281,29 @@ export class QuizDB {
     return raffle;
   }
 
+  async getRafflesNoCache() {
+    const { quizId } = this;
+
+    const raffleDocs = await this.db
+      .quiz()
+      .doc(quizId)
+      .collection(QuizCollection.RAFFLES)
+      .listDocuments();
+
+    const rawRaffles = await Promise.all(raffleDocs.map(async r => [r.id, await r.get()] as const));
+
+    const raffles = rawRaffles
+      .filter(
+        (val): val is [string, FirebaseFirestore.DocumentSnapshot<RaffleDoc>] =>
+          val[1].exists && isRaffleDocument(val[1])
+      )
+      .map(([id, doc]) => {
+        return Raffle.fromDatastore(id, doc.data());
+      });
+
+    return raffles;
+  }
+
   async addToRaffle({
     raffleId,
     firstName,
@@ -344,7 +367,7 @@ export class QuizDB {
     return raffleDoc.id;
   }
 
-  async setRaffleWinner(id: string) {
+  async setRaffleWinner(entrant: RaffleEntrant) {
     const { quizId } = this;
     const raffle = await this.getCurrentRaffle();
     const raffleDoc = await this.db
@@ -353,13 +376,19 @@ export class QuizDB {
       .collection(QuizCollection.RAFFLES)
       .doc(raffle.id);
 
-    if (raffle.winner) {
-      throw ApiError.invalidRequest("Raffle already has a winner!");
-    }
+    await raffleDoc
+      .collection(QuizRaffleCollection.SUBSCRIBERS)
+      .doc(entrant.id)
+      .set(
+        {
+          winner: true
+        },
+        { mergeFields: ["winner"] }
+      );
 
-    raffleDoc.set(
+    await raffleDoc.set(
       {
-        winner: id
+        winner: entrant
       },
       {
         mergeFields: ["winner"]
