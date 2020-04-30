@@ -341,7 +341,7 @@ export class QuizDB {
   async newRaffle(prize: string, requirement: number): Promise<string> {
     const { quizId } = this;
 
-    if (await this.getCurrentRaffle()) {
+    if (await this.getCurrentRaffle(false)) {
       throw new Error("A raffle already exists!");
     }
 
