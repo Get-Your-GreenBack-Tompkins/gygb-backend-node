@@ -134,7 +134,7 @@ export class Quiz extends Model {
       id,
       name,
       questionCount,
-      questions: questions.sort((a, b) => a.id.localeCompare(b.id)),
+      questions: questions.sort((a, b) => a.creationTime - b.creationTime),
       tutorial
     };
   }

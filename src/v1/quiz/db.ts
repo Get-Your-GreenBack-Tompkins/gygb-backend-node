@@ -62,7 +62,7 @@ export async function queryQuiz(quizId: string, db: V1DB): Promise<Quiz> {
     return question;
   });
 
-  const questions = (await Promise.all(unresolvedQuestions)).sort((a, b) => a.creationTime - b.creationTime);
+  const questions = await Promise.all(unresolvedQuestions);
 
   if (!isQuizDocument(quizData)) {
     throw ApiError.internalError(`Invalid quiz document (${quizId})`);
