@@ -72,12 +72,18 @@ export class Raffle extends Model {
 
   toDatastore(): RaffleDoc {
     const { prize, requirement, month, winner } = this;
-    return {
-      prize,
-      requirement,
-      winner,
-      month: firebase.firestore.Timestamp.fromDate(month)
-    };
+    return winner
+      ? {
+          prize,
+          requirement,
+          winner,
+          month: firebase.firestore.Timestamp.fromDate(month)
+        }
+      : {
+          prize,
+          requirement,
+          month: firebase.firestore.Timestamp.fromDate(month)
+        };
   }
 
   static fromDatastore(id: string, data: RaffleDoc): Raffle {
