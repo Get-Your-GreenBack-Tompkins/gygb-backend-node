@@ -1,13 +1,7 @@
 import { Model } from "../../model";
 
 import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
-import {
-  Answer,
-  AnswerDoc,
-  isAnswer,
-  AnswerEdit,
-  isAnswerEdit
-} from "./answer";
+import { Answer, AnswerDoc, isAnswer, AnswerEdit, isAnswerEdit } from "./answer";
 
 import Delta from "quill-delta";
 
@@ -21,7 +15,6 @@ export function header() {
 
 export type QuestionId = string;
 export type QuestionDoc = {
-  order?: number;
   body: RichTextData;
   header: string;
   answerId: number;
@@ -32,7 +25,6 @@ export type QuestionEdit = {
   body: string;
   header: string;
   answers: AnswerEdit[];
-  order: number;
   answerId: number;
 };
 
@@ -49,9 +41,7 @@ export function isQuestionDocument(
   }
 
   const hasAnswers =
-    data.answers &&
-    Array.isArray(data.answers) &&
-    data.answers.every(answer => isAnswer(answer));
+    data.answers && Array.isArray(data.answers) && data.answers.every(answer => isAnswer(answer));
   const hasBody = data.body && isRichTextData(data.body);
   const hasHeader = typeof data.header === "string";
   const hasAnswerId = typeof data.answerId === "number";
@@ -71,39 +61,36 @@ export function isQuestionEdit(data: unknown): data is QuestionEdit {
 
 export class Question extends Model {
   header: string;
-  order: number;
-
   body: RichText;
   answers: Answer[];
   answerId: number;
+  creationTime: number;
 
   constructor(params: {
     id: QuestionId;
     header: string;
-    order: number;
     body: RichText;
     answers: Answer[];
     answerId: number;
+    creationTime?: number;
   }) {
-    const { id, header, order, body, answers, answerId } = params;
+    const { id, header, body, answers, answerId, creationTime = -1 } = params;
 
     super(id);
 
     this.id = id;
     this.header = header;
-    this.order = order;
     this.body = body;
     this.answers = [...answers];
     this.answerId = answerId;
+    this.creationTime = creationTime;
   }
 
   toDatastore(): QuestionDoc {
     return {
       body: this.body.toDatastore(),
       header: this.header,
-      order: this.order,
-      answerId:
-        typeof this.answerId === "number" ? this.answerId : this.answers.length,
+      answerId: typeof this.answerId === "number" ? this.answerId : this.answers.length,
       answers: this.answers.map(answer => answer.toDatastore())
     };
   }
@@ -113,11 +100,10 @@ export class Question extends Model {
   }
 
   static fromDatastore(id: QuestionId, data: QuestionDoc): Question {
-    const { order, answerId, header, answers, body } = data;
+    const { answerId, header, answers, body } = data;
 
     const q = new Question({
       id,
-      order,
       answerId,
       header,
       answers: answers.map(answer => Answer.fromDatastore(answer)),
@@ -128,11 +114,10 @@ export class Question extends Model {
   }
 
   static fromJSON(id: QuestionId, data: QuestionEdit): Question {
-    const { order, answerId, header, answers, body } = data;
+    const { answerId, header, answers, body } = data;
 
     const q = new Question({
       id,
-      order,
       answerId,
       header,
       body: RichText.fromJSON(body),

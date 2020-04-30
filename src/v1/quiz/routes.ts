@@ -167,9 +167,13 @@ export default async function defineRoutes(
 
         const id = Number.parseInt(answerId);
 
+        if (id === Number.NaN) {
+          throw ApiError.invalidRequest(`${answerId} is not a valid answer ID.`);
+        }
+
         await quizdb.deleteAnswer(questionId, id);
 
-        res.status(Status.CREATED).send({ message: "Added." });
+        res.status(Status.OK).send({ message: "Deleted." });
       })
     );
 
