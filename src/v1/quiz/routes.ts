@@ -96,7 +96,7 @@ export default async function defineRoutes(
     authenticated.get(
       "/web-client/raffle/winner",
       asyncify(async (req, res) => {
-        const raffle = await quizdb.getCurrentRaffle();
+        const raffle = await quizdb.getCurrentRaffle(false, false);
 
         if (!raffle) {
           throw ApiError.notFound("No raffle currently.");
@@ -131,6 +131,20 @@ export default async function defineRoutes(
         const raffle = await quizdb.getCurrentRaffle(false);
 
         res.status(Status.OK).send(raffle.toJSON());
+      })
+    );
+
+    authenticated.post(
+      "/web-client/raffle/edit",
+      asyncify(async (req, res) => {
+        const { requirement, prize } = req.body;
+
+        await quizdb.editRaffle({
+          requirement,
+          prize
+        });
+
+        res.status(Status.OK).send({ message: "Edited." });
       })
     );
 
