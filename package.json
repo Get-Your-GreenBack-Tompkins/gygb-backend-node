@@ -1,7 +1,7 @@
 {
   "name": "gygb-backend-node",
   "version": "0.0.1",
-  "description": "Backend for Get Your GreenBack Tompkins services.f",
+  "description": "Backend for Get Your GreenBack Tompkins services.",
   "main": "src/app.ts",
   "license": "Apache-2.0",
   "scripts": {

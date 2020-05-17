@@ -7,6 +7,7 @@ async function authorizeAsync(email: string) {
 }
 
 export default function authorize(email: string) {
+  console.log(`Authorizing for ${process.env.FIREBASE_PROJECT_ID}`);
   authorizeAsync(email)
     .then(() => {
       console.log(`Authorized: ${email}`);

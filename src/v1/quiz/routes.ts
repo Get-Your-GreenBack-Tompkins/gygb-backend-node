@@ -42,7 +42,11 @@ export default async function defineRoutes(
         const quiz = await quizdb.getQuizNoCache();
 
         if (quiz) {
-          res.status(Status.OK).json(quiz.toJSON());
+          const json = quiz.toJSON();
+          res.status(Status.OK).json({
+            ...json,
+            tutorial: json.tutorial.toDatastore()
+          });
         } else {
           res.status(Status.NOT_FOUND).send({ message: "Quiz does not exist!" });
         }
