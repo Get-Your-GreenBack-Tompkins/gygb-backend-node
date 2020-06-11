@@ -1,15 +1,13 @@
 import { Model } from "../../model";
 
-import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
-
 export type ToSDoc = {
-  text: RichTextData;
+  link: string;
   version: string;
 };
 
 export type ToSJSON = {
   platform: string;
-  text: string;
+  link: string;
   version: string;
 };
 
@@ -29,9 +27,9 @@ export function isToSDocument(
 
   const hasVersion = "version" in data && typeof data.version === "string";
 
-  const hasText = "text" in data && isRichTextData(data.text);
+  const hasLink = "link" in data && typeof data.link === "string";
 
-  return hasVersion && hasText;
+  return hasVersion && hasLink;
 }
 
 export function isToSQueryDocument(
@@ -41,7 +39,7 @@ export function isToSQueryDocument(
 }
 
 export class ToS extends Model {
-  text: RichText;
+  link: string;
   version: string;
 
   constructor(id: string) {
@@ -49,28 +47,28 @@ export class ToS extends Model {
   }
 
   toJSON() {
-    const { id: platform, version, text } = this;
+    const { id: platform, version, link } = this;
 
     return {
       platform,
       version,
-      text
+      link
     };
   }
 
   toDatastore() {
-    const { text, version } = this;
+    const { link, version } = this;
 
     return {
       version,
-      text: text.toDatastore()
+      link
     };
   }
 
   static fromJSON(json: ToSJSON) {
     const tos = new ToS(json.platform);
 
-    tos.text = RichText.fromJSON(json.text);
+    tos.link = json.link;
     tos.version = json.version;
 
     return tos;
@@ -79,7 +77,7 @@ export class ToS extends Model {
   static fromDatastore(id: string, doc: ToSDoc) {
     const tos = new ToS(id);
 
-    tos.text = RichText.fromDatastore(doc.text);
+    tos.link = doc.link;
     tos.version = doc.version;
 
     return tos;

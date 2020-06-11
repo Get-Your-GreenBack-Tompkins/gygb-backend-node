@@ -103,7 +103,7 @@ export async function secureRandomNumber(minimum: number, maximum: number): Prom
     );
   }
 
-  let range = maximum - minimum;
+  const range = maximum - minimum;
 
   if (range < -9007199254740991 || range > 9007199254740991) {
     throw new RandomGenerationError(
@@ -111,10 +111,10 @@ export async function secureRandomNumber(minimum: number, maximum: number): Prom
     );
   }
 
-  let { bitsNeeded, bytesNeeded, mask } = calculateParameters(range);
+  const { bitsNeeded, bytesNeeded, mask } = calculateParameters(range);
 
   return randomBytesAsync(bytesNeeded).then(randomBytes => {
-    var randomValue = 0;
+    let randomValue = 0;
 
     /* Turn the random bytes into an integer, using bitwise operations. */
     for (let i = 0; i < bytesNeeded; i++) {

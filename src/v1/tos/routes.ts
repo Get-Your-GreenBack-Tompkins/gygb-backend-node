@@ -9,10 +9,15 @@ import { ApiError } from "../../api/util";
 import { ToSDB } from "./db";
 import { ToS } from "./models/tos";
 
-export default function defineRoutes(db: V1DB, auth: express.RequestHandler): express.Router {
-  const router = express.Router();
-
+export default async function defineRoutes(
+  db: V1DB,
+  auth: express.RequestHandler
+): Promise<express.Router> {
   const tosdb = new ToSDB(db);
+
+  await tosdb.migrate(db);
+
+  const router = express.Router();
 
   router.post(
     "/:id/edit",

@@ -1,0 +1,24 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@master
+    - name: Set up Node
+      uses: actions/setup-node@v1
+      with:
+        node-version: '12.x'
+    - name: NPM Lint
+      run: npm run lint
+    - name: NPM Build
+      run: npm run build
+    - name: Archive Production Build
+      uses: actions/upload-artifact@master
+      with:
+        name: build-admin-commit
+        path: build

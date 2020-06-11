@@ -464,8 +464,8 @@ export class QuizDB {
       id: document.id,
       answers: [],
       body: new RichText(),
-      header: `New Question`,
-      answerId: 0,
+      header: "New Question",
+      answerId: 0
     });
 
     await document.set(question.toDatastore());

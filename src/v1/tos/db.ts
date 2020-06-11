@@ -1,26 +1,32 @@
+import { MigratableDB } from "../../db";
+
 import { V1DB } from "../db";
 import { ToS, isToSDocument } from "./models/tos";
 import { ApiError } from "../../api/util";
 
-export class ToSDB {
-  private db: V1DB;
-
+export class ToSDB extends MigratableDB {
   constructor(db: V1DB) {
-    this.db = db;
+    super(db);
+  }
+
+  async migrateHook(versionTo: number): Promise<void> {
+    switch (versionTo) {
+      case 1:
+        for (const id of ["hotshot", "quiz"]) {
+          await this.db.tos().doc(id).update({
+            link: "https://example.com"
+          });
+        }
+        break;
+    }
   }
 
   async updateToS(tos: ToS) {
-    await this.db
-      .tos()
-      .doc(tos.id)
-      .set(tos.toDatastore());
+    await this.db.tos().doc(tos.id).set(tos.toDatastore());
   }
 
   async getToS(platform: "hotshot" | "quiz"): Promise<ToS | null> {
-    const tosDoc = await this.db
-      .tos()
-      .doc(platform)
-      .get();
+    const tosDoc = await this.db.tos().doc(platform).get();
 
     if (!tosDoc.exists) {
       throw ApiError.notFound("No ToS document found.");
