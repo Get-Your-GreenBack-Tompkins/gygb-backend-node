@@ -48,7 +48,9 @@ export default async function defineRoutes(
             tutorial: json.tutorial.toDatastore()
           });
         } else {
-          res.status(Status.NOT_FOUND).send({ message: "Quiz does not exist!" });
+          res
+            .status(Status.NOT_FOUND)
+            .send({ message: "Quiz does not exist!" });
         }
       })
     );
@@ -93,7 +95,9 @@ export default async function defineRoutes(
       asyncify(async (_, res) => {
         const raffles = await quizdb.getRafflesNoCache();
 
-        res.status(Status.OK).send({ raffles: raffles.map(r => r.toAuthenticatedJSON()) });
+        res
+          .status(Status.OK)
+          .send({ raffles: raffles.map(r => r.toAuthenticatedJSON()) });
       })
     );
 
@@ -114,7 +118,10 @@ export default async function defineRoutes(
 
         const numOfEntrants = entrants.length;
 
-        const winnerIndex = numOfEntrants === 1 ? 0 : await secureRandomNumber(0, numOfEntrants - 1);
+        const winnerIndex =
+          numOfEntrants === 1
+            ? 0
+            : await secureRandomNumber(0, numOfEntrants - 1);
         const winner = entrants[winnerIndex];
 
         await quizdb.setRaffleWinner(winner);
@@ -192,7 +199,9 @@ export default async function defineRoutes(
         const id = Number.parseInt(answerId);
 
         if (id === Number.NaN) {
-          throw ApiError.invalidRequest(`${answerId} is not a valid answer ID.`);
+          throw ApiError.invalidRequest(
+            `${answerId} is not a valid answer ID.`
+          );
         }
 
         await quizdb.deleteAnswer(questionId, id);
@@ -204,8 +213,6 @@ export default async function defineRoutes(
     authenticated.get(
       "/web-client/question/:questionId/edit",
       asyncify(async (req, res) => {
-        // TODO Authenticate
-
         const { questionId } = req.params;
 
         const question = await quizdb.getQuestion(questionId);
@@ -213,7 +220,9 @@ export default async function defineRoutes(
         if (question) {
           res.json(question.toDatastore());
         } else {
-          return res.status(Status.NOT_FOUND).send({ message: "Question not found. " });
+          return res
+            .status(Status.NOT_FOUND)
+            .send({ message: "Question not found." });
         }
       })
     );
@@ -221,13 +230,14 @@ export default async function defineRoutes(
     authenticated.post(
       "/web-client/question/:questionId/edit",
       asyncify(async (req, res) => {
-        // TODO Authenticate
         const { questionId } = req.params;
         const body = req.body as unknown;
 
         if (!isQuestionEdit(body)) {
           console.log("Attempted Bad Question Edit: ", body);
-          return res.status(Status.BAD_REQUEST).send({ message: "Not a valid question edit." });
+          return res
+            .status(Status.BAD_REQUEST)
+            .send({ message: "Not a valid question edit." });
         }
 
         const newQuestion = Question.fromJSON(questionId, body);
@@ -250,7 +260,10 @@ export default async function defineRoutes(
       asyncify(async (_, res) => {
         const tutorial = await quizdb.getTutorial();
         const quiz = await quizdb.getQuiz();
-        const numOfQuestions = Math.min(quiz.questionCount, quiz.questions.length);
+        const numOfQuestions = Math.min(
+          quiz.questionCount,
+          quiz.questions.length
+        );
 
         res.status(Status.OK).send({
           ...tutorial,
@@ -270,10 +283,15 @@ export default async function defineRoutes(
 
         const quiz = await quizdb.getQuiz();
 
-        const numberOfQuestions = Math.min(quiz.questionCount, quiz.questions.length);
+        const numberOfQuestions = Math.min(
+          quiz.questionCount,
+          quiz.questions.length
+        );
 
         return res.status(Status.OK).send({
-          questionRequirement: Math.floor(raffle.requirement * numberOfQuestions),
+          questionRequirement: Math.floor(
+            raffle.requirement * numberOfQuestions
+          ),
           prize: raffle.prize
         });
       })
@@ -282,7 +300,12 @@ export default async function defineRoutes(
     unauthenticated.post(
       "/web-client/raffle/enter",
       asyncify(async (req, res) => {
-        const { answers = null, firstName = null, lastName = null, email = null } = req.body;
+        const {
+          answers = null,
+          firstName = null,
+          lastName = null,
+          email = null
+        } = req.body;
 
         if (![answers, firstName, lastName, email].every(a => a != null)) {
           throw ApiError.invalidRequest("Missing data.");
@@ -338,7 +361,9 @@ export default async function defineRoutes(
         const id = Number.parseInt(answerId);
 
         if (Number.isNaN(id)) {
-          return res.status(Status.BAD_REQUEST).send({ message: "Invalid answer ID passed." });
+          return res
+            .status(Status.BAD_REQUEST)
+            .send({ message: "Invalid answer ID passed." });
         }
 
         const answer = await quizdb.getAnswer(questionId, id);

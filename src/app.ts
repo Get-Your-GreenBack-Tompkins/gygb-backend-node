@@ -5,7 +5,7 @@ import { GreenBackDB } from "./db";
 import serve from "./server";
 import authorize from "./authorize";
 
-(function() {
+(function () {
   if (process.argv.length > 2) {
     if (process.argv[2] === "--authorize") {
       const argv3 = process.argv[3];

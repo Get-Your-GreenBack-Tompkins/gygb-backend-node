@@ -44,10 +44,7 @@ export class UserDB {
   }
 
   async getUser(email: string): Promise<User | null> {
-    const users = await this.db
-      .users()
-      .where("email", "==", email)
-      .get();
+    const users = await this.db.users().where("email", "==", email).get();
 
     if (users.docs.length > 1) {
       throw new Error("Multiple users exist with the same email!");
