@@ -2,6 +2,8 @@ import { V1DB } from "../db";
 
 import { ApiError } from "../../api/util";
 
+import { MigratableDB } from "../../db";
+
 import { Quiz, isQuizDocument } from "./models/quiz";
 import { Answer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
@@ -67,14 +69,29 @@ export async function queryQuiz(quizId: string, db: V1DB): Promise<Quiz> {
 
 type Subscription = (() => void) | null;
 
-export class QuizDB {
-  private db: V1DB;
+export class QuizDB extends MigratableDB {
+
   private quizId: string;
   private quiz: Quiz;
 
   constructor(db: V1DB, quizId: string) {
-    this.db = db;
+    super(db);
+
     this.quizId = quizId;
+  }
+
+  protected async migrateHook(versionTo: number): Promise<void> {
+    const { quizId } = this;
+    switch (versionTo) {
+      case 2:
+          await this.db.quiz().doc(quizId).update({
+             defaultRaffle: {
+               prize: "Default Prize",
+               requirement: 0.6
+             }
+          });
+        break;
+    }
   }
 
   async getQuizNoCache(): Promise<Quiz> {
@@ -210,8 +227,12 @@ export class QuizDB {
     if (potentialRaffles.size == 0) {
       if (generate) {
         console.log("No raffle found, attempting to generate the raffle automatically...");
-        // TODO Support editing these defaults.
-        const id = await this.newRaffle("Unknown Prize", 0.5);
+
+        if (!this.quiz.defaultRaffle) {
+          throw new Error("No default raffle options exist! You must manually create the raffle.");
+        }
+
+        const id = await this.newRaffle(this.quiz.defaultRaffle.prize, this.quiz.defaultRaffle.requirement);
         console.log("id: ", id);
         return await this.getCurrentRaffle(false, false);
       }
@@ -594,11 +615,11 @@ export class QuizDB {
     const { quizId } = this;
     const quizDoc = await this.db.quiz().doc(quizId);
 
-    const { name, questionCount, tutorial } = quiz.toDatastore();
-    const update = { name, questionCount, tutorial };
+    const { name, questionCount, tutorial, defaultRaffle } = quiz.toDatastore();
+    const update = { name, questionCount, tutorial, defaultRaffle };
 
     const result = await quizDoc.set(update, {
-      mergeFields: ["name", "questionCount", "tutorial"],
+      mergeFields: ["name", "questionCount", "tutorial", "defaultRaffle"],
     });
 
     return result.writeTime.nanoseconds;

@@ -64,7 +64,7 @@ export class GreenBackDB {
   }
 
   async apiVersion(): Promise<number> {
-    return 1;
+    return 2;
   }
 
   meta() {

@@ -45,7 +45,12 @@ export function isRaffleQueryDocument(
   return isRaffleDocument(doc);
 }
 
-export class Raffle extends Model {
+export type PrizeInfo = {
+  prize: string;
+  requirement: number;
+}
+
+export class Raffle extends Model implements PrizeInfo {
   prize: string;
   requirement: number;
   month: Date;

@@ -9,7 +9,7 @@ export class ToSDB extends MigratableDB {
     super(db);
   }
 
-  async migrateHook(versionTo: number): Promise<void> {
+  protected async migrateHook(versionTo: number): Promise<void> {
     switch (versionTo) {
       case 1:
         for (const id of ["hotshot", "quiz"]) {
