@@ -1,7 +1,13 @@
 import { Model } from "../../model";
 
 import { Question, QuestionDoc } from "./question";
-import { TutorialDoc, isTutorialDocument, Tutorial, isTutorialEdit } from "./tutorial";
+import {
+  TutorialDoc,
+  isTutorialDocument,
+  Tutorial,
+  isTutorialEdit
+} from "./tutorial";
+import { PrizeInfo } from "./raffle";
 
 export type QuizId = string;
 export type QuizDoc = {
@@ -9,13 +15,20 @@ export type QuizDoc = {
   name: string;
   tutorial: TutorialDoc;
   questions: QuestionDoc[];
+  defaultRaffle: PrizeInfo;
 };
 
 export type QuizJson = {
   questionCount: number;
   name: string;
   tutorial: { header: string; body: string };
+  defaultRaffle: PrizeInfo;
 };
+
+export function isRaffleInfo(data: unknown): data is PrizeInfo {
+  const asEdit = data as PrizeInfo;
+  return typeof asEdit.prize === "string" && typeof asEdit.requirement === "number";
+}
 
 export function isQuizQueryDocument(
   doc: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>
@@ -30,7 +43,9 @@ export function isQuizQueryDocument(
     "questionCount" in data &&
     typeof data.questionCount === "number" &&
     "tutorial" in data &&
-    isTutorialDocument(data.tutorial)
+    isTutorialDocument(data.tutorial) &&
+    "defaultRaffle" in data &&
+    isRaffleInfo(data.defaultRaffle)
   );
 }
 
@@ -47,7 +62,9 @@ export function isQuizDocument(
     "questionCount" in data &&
     typeof data.questionCount === "number" &&
     "tutorial" in data &&
-    isTutorialDocument(data.tutorial)
+    isTutorialDocument(data.tutorial) &&
+    "defaultRaffle" in data &&
+    isRaffleInfo(data.defaultRaffle)
   );
 }
 
@@ -62,7 +79,9 @@ export function isQuizEdit(data: unknown): data is QuizJson {
     "questionCount" in asEdit &&
     typeof asEdit.questionCount === "number" &&
     "tutorial" in asEdit &&
-    isTutorialEdit(asEdit.tutorial)
+    isTutorialEdit(asEdit.tutorial) &&
+    "defaultRaffle" in asEdit &&
+    isRaffleInfo(asEdit.defaultRaffle)
   );
 }
 
@@ -85,12 +104,57 @@ function getRandom<T>(arr: T[], n: number): T[] {
   return result;
 }
 
+export class DefaultRaffleInfo implements PrizeInfo {
+  prize: string;
+  requirement: number;
+
+  constructor(params: { prize: string; requirement: number }) {
+    const { prize, requirement } = params;
+
+    this.prize = prize;
+    this.requirement = requirement;
+  }
+
+  toJSON() {
+    const { prize, requirement } = this;
+
+    return { prize, requirement };
+  }
+
+  toDatastore() {
+    const { prize, requirement } = this;
+
+    return { prize, requirement };
+  }
+
+  static fromJSON(json: PrizeInfo): DefaultRaffleInfo {
+    const { prize, requirement } = json;
+
+    return new DefaultRaffleInfo({
+      prize: `${prize}`,
+      requirement
+    });
+  }
+
+  static fromDatastore(data: PrizeInfo): DefaultRaffleInfo {
+    const { prize, requirement } = data;
+
+    const dr = new DefaultRaffleInfo({
+      prize,
+      requirement
+    });
+
+    return dr;
+  }
+}
+
 export class Quiz extends Model {
   id: QuizId;
   name: string;
   questionCount: number;
   questions: Question[];
   tutorial: Tutorial;
+  defaultRaffle: DefaultRaffleInfo;
 
   constructor(params: {
     id: string;
@@ -98,14 +162,24 @@ export class Quiz extends Model {
     questions: Question[];
     questionCount: number;
     tutorial: Tutorial;
+    defaultRaffle: DefaultRaffleInfo;
   }) {
-    const { id, name, questions, questionCount, tutorial } = params;
+    const {
+      id,
+      name,
+      questions,
+      questionCount,
+      tutorial,
+      defaultRaffle
+    } = params;
+
     super(id);
 
     this.name = name;
     this.questions = questions;
     this.questionCount = questionCount;
     this.tutorial = tutorial;
+    this.defaultRaffle = defaultRaffle;
   }
 
   toRandomizedJSON() {
@@ -114,7 +188,9 @@ export class Quiz extends Model {
     const length = Math.min(questions.length, questionCount);
 
     if (length !== questionCount) {
-      console.warn(`Too few questions for given question count in quiz ${name}.`);
+      console.warn(
+        `Too few questions for given question count in quiz ${name}.`
+      );
     }
 
     const randomQuestions = getRandom(questions, length);
@@ -128,33 +204,45 @@ export class Quiz extends Model {
   }
 
   toJSON() {
-    const { id, questions, name, questionCount, tutorial } = this;
+    const {
+      id,
+      questions,
+      name,
+      questionCount,
+      tutorial,
+      defaultRaffle
+    } = this;
 
     return {
       id,
       name,
       questionCount,
       questions: questions.sort((a, b) => a.creationTime - b.creationTime),
-      tutorial
+      tutorial,
+      defaultRaffle
     };
   }
 
   static fromJSON(id: string, quizJson: QuizJson): Quiz {
-    const { name, questionCount, tutorial } = quizJson;
+    const { name, questionCount, tutorial, defaultRaffle } = quizJson;
 
     const quiz = new Quiz({
       id,
       questions: [],
-      questionCount,
+      questionCount: questionCount,
       name,
-      tutorial: Tutorial.fromJSON(tutorial)
+      tutorial: Tutorial.fromJSON(tutorial),
+      defaultRaffle: DefaultRaffleInfo.fromJSON(defaultRaffle)
     });
 
     return quiz;
   }
 
-  static fromDatastore(id: string, quizDoc: QuizDoc): (questions: Question[]) => Quiz {
-    const { name, questionCount, tutorial } = quizDoc;
+  static fromDatastore(
+    id: string,
+    quizDoc: QuizDoc
+  ): (questions: Question[]) => Quiz {
+    const { name, questionCount, tutorial, defaultRaffle } = quizDoc;
 
     return (questions: Question[]) => {
       const quiz = new Quiz({
@@ -162,7 +250,8 @@ export class Quiz extends Model {
         questions,
         questionCount,
         name,
-        tutorial: Tutorial.fromDatastore(tutorial)
+        tutorial: Tutorial.fromDatastore(tutorial),
+        defaultRaffle: DefaultRaffleInfo.fromDatastore(defaultRaffle)
       });
 
       return quiz;
@@ -170,8 +259,8 @@ export class Quiz extends Model {
   }
 
   toDatastore() {
-    const { name, questionCount, tutorial } = this;
+    const { name, questionCount, tutorial, defaultRaffle } = this;
 
-    return { name, questionCount, tutorial: tutorial.toDatastore() };
+    return { name, questionCount, tutorial: tutorial.toDatastore(), defaultRaffle: defaultRaffle.toDatastore() };
   }
 }

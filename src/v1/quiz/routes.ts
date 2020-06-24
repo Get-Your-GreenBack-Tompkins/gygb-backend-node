@@ -26,6 +26,8 @@ export default async function defineRoutes(
 ): Promise<express.Router> {
   const quizdb = registerQuizDB(db, "web-client");
 
+  await quizdb.migrate(db);
+
   try {
     await quizdb.listen();
   } catch (error) {
