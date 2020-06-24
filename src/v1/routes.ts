@@ -19,7 +19,7 @@ export default async function defineRoutes(db: GreenBackDB, auth: express.Reques
 
   // After all routes are defined, migrations should be complete.
   // If a migration failed, it should have thrown an error which would prevent this code from calling.
-  db.finishMigrations();
+  await db.finishMigrations();
 
   return app;
 }
