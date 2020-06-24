@@ -17,5 +17,9 @@ export default async function defineRoutes(db: GreenBackDB, auth: express.Reques
   app.use("/tos/", await tosRoutes(db, auth));
   app.use("/admin/", await adminRoutes(auth));
 
+  // After all routes are defined, migrations should be complete.
+  // If a migration failed, it should have thrown an error which would prevent this code from calling.
+  db.finishMigrations();
+
   return app;
 }
