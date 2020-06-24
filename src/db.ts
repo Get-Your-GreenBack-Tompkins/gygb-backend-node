@@ -29,16 +29,10 @@ export abstract class MigratableDB {
 
     for (let x = versionFrom + 1; x <= versionTo; x++) {
       console.log(
-        `Migrating ${db.constructor.name} from ${versionFrom} to ${versionTo}...`
+        `Migrating ${this.constructor.name} to version ${x}...`
       );
       await this.migrateHook(x);
     }
-
-    await db.meta().doc("db-info").set({
-      currentVersion: versionTo,
-    });
-
-    console.log(`Migration from ${versionFrom} to ${versionTo} complete.`);
   }
 }
 
@@ -51,6 +45,21 @@ export class GreenBackDB {
 
   get raw() {
     return this._db;
+  }
+
+  async finishMigrations() {
+    const versionTo = await this.apiVersion();
+    const versionFrom = await this.currentVersion();
+
+    await this.meta().doc("db-info").set({
+      currentVersion: versionTo,
+    });
+  
+    if (versionFrom !== versionTo) {
+      console.log(`Migration from ${versionFrom} to ${versionTo} complete.`);
+    } else {
+      console.log(`Initialized with API v${versionTo}`);
+    }
   }
 
   async currentVersion(): Promise<number> {
