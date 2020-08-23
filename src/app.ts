@@ -2,6 +2,7 @@ import "./env";
 
 import { GreenBackDB } from "./db";
 
+import firebase from "./firebase";
 import serve from "./server";
 import authorize from "./authorize";
 
@@ -18,9 +19,11 @@ import authorize from "./authorize";
     }
   }
 
-  const db = new GreenBackDB();
+  const firestore = firebase.firestore();
+  const auth = firebase.auth();
+  const db = new GreenBackDB(firestore);
 
-  serve(db)
+  serve(auth, db)
     .then(() => {
       console.log("Started!");
     })

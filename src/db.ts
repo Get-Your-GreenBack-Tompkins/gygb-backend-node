@@ -1,4 +1,4 @@
-import firebase from "./firebase";
+import { firestore } from "firebase-admin";
 
 export enum Collection {
   USERS = "users",
@@ -37,10 +37,10 @@ export abstract class MigratableDB {
 }
 
 export class GreenBackDB {
-  private _db: FirebaseFirestore.Firestore;
+  private _db: firestore.Firestore;
 
-  constructor() {
-    this._db = firebase.firestore();
+  constructor(firestore: firestore.Firestore) {
+    this._db = firestore;
   }
 
   get raw() {

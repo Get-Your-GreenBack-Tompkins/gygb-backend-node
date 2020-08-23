@@ -1,7 +1,9 @@
 import { AuthDB } from "./middleware/auth/db";
 
+import firebase from "./firebase";
+
 async function authorizeAsync(email: string) {
-  const authdb = new AuthDB();
+  const authdb = new AuthDB(firebase.auth());
 
   await authdb.addAdmin(email);
 }
