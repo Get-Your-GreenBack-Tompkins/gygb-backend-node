@@ -4,6 +4,7 @@ import * as Status from "http-status-codes";
 import { asyncify } from "../../middleware/async";
 
 import { AuthDB } from "../../middleware/auth/db";
+import cors, { CorsOptions } from "cors";
 
 function hasEmail(x: unknown): x is { email: string } {
   const asEmail = x as { email: string };
@@ -11,8 +12,11 @@ function hasEmail(x: unknown): x is { email: string } {
   return typeof x === "object" && "email" in asEmail && typeof asEmail.email === "string";
 }
 
-export default async function defineRoutes(auth: express.RequestHandler): Promise<express.Router> {
+export default async function defineRoutes(auth: express.RequestHandler, corsOptions: CorsOptions): Promise<express.Router> {
   const router = express.Router();
+
+  router.options("*", cors(corsOptions));
+  router.use(cors(corsOptions));
 
   router.use(auth);
 
