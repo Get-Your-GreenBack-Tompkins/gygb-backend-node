@@ -8,11 +8,12 @@ module.exports = {
         "ts",
         "js"
     ],
+    modulePathIgnorePatterns: ["<rootDir>/dist/"],
     transform: {
         "^.+\\.(ts|tsx)$": "ts-jest"
     },
     testMatch: [
-        "**/test/**/*.test.(ts|js)"
+        "**/*.spec.(ts|js)"
     ],
     testEnvironment: "node"
 };
