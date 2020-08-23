@@ -141,7 +141,7 @@ export class Question extends Model {
 
     return {
       id,
-      body,
+      body: body.toJSON(),
       header,
       answers,
       answerId

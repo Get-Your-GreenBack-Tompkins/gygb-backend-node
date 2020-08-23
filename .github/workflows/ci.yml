@@ -3,6 +3,31 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@master
+    - name: Set up Node
+      uses: actions/setup-node@v1
+      with:
+        node-version: '12.x'
+        registry-url: https://npm.pkg.github.com
+        scope: '@get-your-greenback-tompkins'
+    - name: Yarn Install
+      run: yarn --frozen-lockfile
+      env:
+        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+    - name: Yarn Build
+      run: yarn run build
+    - name: Yarn Test
+      run: yarn test
+    - name: Archive Coverage
+      uses: actions/upload-artifact@master
+      with:
+        name: coverage-backend-commit
+        path: coverage
   build:
     name: Lint & Build
     runs-on: ubuntu-latest
@@ -13,14 +38,18 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: '12.x'
-    - name: NPM Install
-      run: npm install
-    - name: NPM Lint
-      run: npm run lint
-    - name: NPM Build
-      run: npm run build
-    - name: Archive Production Build
+        registry-url: https://npm.pkg.github.com
+        scope: '@get-your-greenback-tompkins'
+    - name: Yarn Install
+      run: yarn --frozen-lockfile
+      env:
+        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+    - name: Yarn Lint
+      run: yarn run lint
+    - name: Yarn Build
+      run: yarn run build
+    - name: Archive Build
       uses: actions/upload-artifact@master
       with:
-        name: build-admin-commit
-        path: build
+        name: build-backend-commit
+        path: dist
