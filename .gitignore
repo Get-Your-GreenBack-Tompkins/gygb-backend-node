@@ -48,4 +48,7 @@ dist
 # Things that definitely shouldn't be in git.
 secrets
 
+# Jest's coverage output
+coverage
+
 .DS_Store
