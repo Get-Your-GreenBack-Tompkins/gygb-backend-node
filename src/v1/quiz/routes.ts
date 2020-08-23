@@ -2,7 +2,6 @@ import * as express from "express";
 import * as Status from "http-status-codes";
 
 import { ApiError } from "../../api/util";
-import { cache, cacheResult } from "../../middleware/cache";
 import { asyncify } from "../../middleware/async";
 import { secureRandomNumber } from "../../lib/random";
 
@@ -360,11 +359,6 @@ export default async function defineRoutes(
 
     unauthenticated.get(
       "/web-client/question/:questionId/verify-answer/:answerId",
-      cache(req => {
-        const { quizId, questionId, answerId } = req.params;
-
-        return `verifyAnswer(${quizId}, ${questionId}, ${answerId}})`;
-      }),
       asyncify(async (req, res) => {
         const { questionId, answerId } = req.params;
 
@@ -412,16 +406,13 @@ export default async function defineRoutes(
 
     unauthenticated.get(
       "/web-client",
-      cache(r => (r.params.id ? `quizById(${r.params.id})` : "quizById")),
       asyncify(async (_, res) => {
         const quiz = await quizdb.getQuiz();
 
-        const cachedRes = cacheResult(res);
-
         if (quiz) {
-          cachedRes.send(Status.OK, quiz.toRandomizedJSON());
+          res.status(Status.OK).send(quiz.toRandomizedJSON());
         } else {
-          cachedRes.send(Status.NOT_FOUND, { message: "Quiz does not exist!" });
+          res.status(Status.NOT_FOUND).send({ message: "Quiz does not exist!" });
         }
       })
     );
