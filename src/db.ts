@@ -76,6 +76,17 @@ export class GreenBackDB {
     return 2;
   }
 
+  async corsWhitelist(): Promise<string[]> {
+    const config = await this.meta().doc("site-config").get();
+
+    // Default to an empty whitelist if not setup.
+    if (!config.exists) {
+      return [];
+    }
+
+    return config.data().corsWhitelist || [];
+  }
+
   meta() {
     return this._db.collection(Collection.META);
   }

@@ -13,8 +13,20 @@ export default async function serve(db: GreenBackDB) {
   app.use(apiErrors);
   app.use(express.json());
 
-  app.use(cors({ origin: "*" }));
-  app.options("*", cors({ origin: "*" }));
+  const whitelist = await db.corsWhitelist();
+
+  const corsOptions: cors.CorsOptions = {
+    origin: (origin, callback) => {
+      if (whitelist.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS: Invalid Origin!"));
+      }
+    }
+  };
+
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
 
   const auth = initializeAuth();
 
