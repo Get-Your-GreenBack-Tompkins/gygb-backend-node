@@ -33,6 +33,10 @@ export type Unknown<K> = { [k in keyof K]: unknown };
 export function isQuestionDocument(
   doc: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.DocumentData>
 ): doc is FirebaseFirestore.DocumentSnapshot<QuestionDoc> {
+  if (!doc) {
+    return false;
+  }
+
   const asQuiz = doc as FirebaseFirestore.DocumentSnapshot<QuestionDoc>;
   const data = asQuiz.data();
 
@@ -50,11 +54,16 @@ export function isQuestionDocument(
 }
 
 export function isQuestionEdit(data: unknown): data is QuestionEdit {
+  if (data === null || typeof data !== "object") {
+    return false;
+  }
+
   const asEdit = data as QuestionEdit;
   return (
     typeof asEdit.body === "string" &&
     typeof asEdit.header === "string" &&
     typeof asEdit.answerId === "number" &&
+    Array.isArray(asEdit.answers) &&
     asEdit.answers.every(answer => isAnswerEdit(answer))
   );
 }
