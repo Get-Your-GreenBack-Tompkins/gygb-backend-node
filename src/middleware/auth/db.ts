@@ -1,14 +1,19 @@
 import { ApiError } from "../../api/util";
 
-import firebase from "../../firebase";
 import { auth } from "firebase-admin";
 
 export class AuthDB {
+  _auth: auth.Auth;
+
+  constructor(auth: auth.Auth) {
+    this._auth = auth;
+  }
+
   async addAdmin(email: string) {
     try {
-      const record = await firebase.auth().getUserByEmail(email);
+      const record = await this._auth.getUserByEmail(email);
 
-      await firebase.auth().setCustomUserClaims(record.uid, { admin: true });
+      await this._auth.setCustomUserClaims(record.uid, { admin: true });
     } catch (err) {
       console.error(err);
 
@@ -17,13 +22,13 @@ export class AuthDB {
   }
 
   async removeAdmin(email: string) {
-    const record = await firebase.auth().getUserByEmail(email);
+    const record = await this._auth.getUserByEmail(email);
 
     if (!record) {
       throw ApiError.notFound("No user was found under that email.");
     }
 
-    await firebase.auth().setCustomUserClaims(record.uid, { admin: false });
+    await this._auth.setCustomUserClaims(record.uid, { admin: false });
   }
 
   async getAdmins(): Promise<string[]> {
@@ -33,7 +38,7 @@ export class AuthDB {
       let batch = initialBatch;
 
       while (batch.pageToken) {
-        batch = await firebase.auth().listUsers(undefined, batch.pageToken);
+        batch = await this._auth.listUsers(undefined, batch.pageToken);
 
         yield batch.users;
       }
@@ -41,7 +46,7 @@ export class AuthDB {
 
     const users = [];
 
-    const initialBatch = await firebase.auth().listUsers();
+    const initialBatch = await this._auth.listUsers();
 
     for await (const usersBatch of getAllUsers(initialBatch)) {
       users.push(

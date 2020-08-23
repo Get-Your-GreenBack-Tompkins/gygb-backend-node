@@ -3,9 +3,10 @@ import * as Status from "http-status-codes";
 
 import { ApiError } from "../../api/util";
 
-import firebase from "../../firebase";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { auth } from "firebase-admin";
 
-export function initializeAuth() {
+export function initializeAuth(auth: auth.Auth) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const bearerAuth = req.get("Authorization");
 
@@ -21,8 +22,7 @@ export function initializeAuth() {
 
     const [, idToken] = parts;
 
-    firebase
-      .auth()
+    auth
       .verifyIdToken(idToken, true)
       .then(claims => {
         return claims.admin === true;

@@ -7,17 +7,26 @@ import { apiErrors } from "./middleware/error";
 import { initializeAuth } from "./middleware/auth/middleware";
 import { GreenBackDB } from "./db";
 
-export default async function serve(db: GreenBackDB) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { auth } from "firebase-admin";
+
+export async function createApp(auth: auth.Auth, db: GreenBackDB): Promise<express.Express> {
   const app = express();
 
   app.use(apiErrors);
   app.use(express.json());
 
-  const auth = initializeAuth();
-
   app.use(cors());
+  
+  const authMiddleware = initializeAuth(auth);
 
-  app.use("/v1/", await v1(db, auth));
+  app.use("/v1/", await v1(db, authMiddleware, auth));
+
+  return app;
+}
+
+export default async function serve(auth: auth.Auth, db: GreenBackDB) {
+  const app = await createApp(auth, db);
 
   const server = app.listen(process.env.PORT || 5150, () => {
     const addr = server.address();
