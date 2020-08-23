@@ -20,6 +20,9 @@
         "src/**/*"
     ],
     "exclude": [
+        "src/**/*.spec.ts",
+        "src/**/*.mock.ts",
+        "src/__mocks__/**/*",
         "node_modules/**/*"
     ]
 }

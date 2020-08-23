@@ -10,7 +10,9 @@
     "build:ts": "tsc",
     "dev": "yarn run build:ts && yarn run serve",
     "dev:test": "yarn run test -- --watchAll",
-    "test": "jest --forceExit --coverage --verbose",
+    "test": "jest --detectOpenHandles --coverage --verbose",
+    "test:quiet": "jest --detectOpenHandles --coverage",
+    "test:nocov": "jest --detectOpenHandles --verbose",
     "lint": "tsc --noEmit && eslint \"src/**/*.ts\" --quiet --fix",
     "debug": "node --inspect dist/app.js"
   },
@@ -23,6 +25,7 @@
     "@firebase/util": "^0.3.1"
   },
   "devDependencies": {
+    "@get-your-greenback-tompkins/ts-mock-firebase": "^2.3.0",
     "@types/antlr4": "^4.7.2",
     "@types/cors": "^2.8.6",
     "@types/express": "^4.17.2",
@@ -35,11 +38,10 @@
     "@typescript-eslint/parser": "^2.19.2",
     "concurrently": "^5.1.0",
     "eslint": "^6.8.0",
-    "jest": "^25.1.0",
+    "jest": "^26.4.2",
     "nodemon": "^2.0.2",
     "supertest": "^4.0.2",
     "ts-jest": "^26.2.0",
-    "ts-mock-firebase": "^2.3.0",
     "typescript": "^3.7.5"
   },
   "dependencies": {

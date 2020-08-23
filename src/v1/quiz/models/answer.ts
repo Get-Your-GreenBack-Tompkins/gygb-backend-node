@@ -73,9 +73,10 @@ export class Answer {
 
   toJSON() {
     const { id, text, correct, message } = this;
+
     return {
       id,
-      text,
+      text: text.toJSON(),
       correct,
       message
     };
