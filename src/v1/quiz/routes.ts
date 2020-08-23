@@ -11,6 +11,7 @@ import { V1DB } from "../db";
 import { registerQuizDB } from "./db";
 import { Question, isQuestionEdit } from "./models/question";
 import { Quiz, isQuizEdit } from "./models/quiz";
+import cors, { CorsOptions } from "cors";
 
 function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
   return (
@@ -22,6 +23,7 @@ function isAnswerMap(obj: unknown): obj is { [key: string]: number } {
 
 export default async function defineRoutes(
   db: V1DB,
+  corsOptions: CorsOptions,
   auth: express.RequestHandler
 ): Promise<express.Router> {
   const quizdb = registerQuizDB(db, "web-client");
@@ -35,6 +37,9 @@ export default async function defineRoutes(
   }
 
   function setupAuthenticated(authenticated: express.Router) {
+    authenticated.options("*", cors(corsOptions));
+    authenticated.use(cors(corsOptions));
+
     // Enable authentication
     authenticated.use(auth);
 
@@ -257,6 +262,9 @@ export default async function defineRoutes(
   }
 
   function setupUnauthenticated(unauthenticated: express.Router) {
+    unauthenticated.options("*", cors(corsOptions));
+    unauthenticated.use(cors(corsOptions));
+
     unauthenticated.get(
       "/web-client/tutorial",
       asyncify(async (_, res) => {

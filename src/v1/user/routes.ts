@@ -9,17 +9,26 @@ import { V1DB } from "../db";
 
 import { UserDB } from "./db";
 import { UserSource } from "./models/user";
+import cors, { CorsOptions } from "cors";
 
 function hasEmail(x: unknown): x is { email: string } {
   const asEmail = x as { email: string };
 
-  return typeof x === "object" && "email" in asEmail && typeof asEmail.email === "string";
+  return (
+    typeof x === "object" &&
+    "email" in asEmail &&
+    typeof asEmail.email === "string"
+  );
 }
 
 function hasMarketing(x: unknown): x is { marketing: boolean } {
   const asMarketing = x as { marketing: boolean };
 
-  return typeof x === "object" && "marketing" in asMarketing && typeof asMarketing.marketing === "boolean";
+  return (
+    typeof x === "object" &&
+    "marketing" in asMarketing &&
+    typeof asMarketing.marketing === "boolean"
+  );
 }
 
 function hasSource(x: unknown): x is { source: UserSource } {
@@ -33,13 +42,19 @@ function hasSource(x: unknown): x is { source: UserSource } {
   );
 }
 
-export default function defineRoutes(db: V1DB, auth: express.RequestHandler): express.Router {
+export default function defineRoutes(
+  db: V1DB,
+  corsOptions: CorsOptions,
+  auth: express.RequestHandler
+): express.Router {
   const router = express.Router();
 
   const userdb = new UserDB(db);
 
+  router.options("/emails/marketing", cors(corsOptions));
   router.get(
     "/emails/marketing",
+    cors(corsOptions),
     auth,
     asyncify(async (_, res) => {
       const users = await userdb.getEmailList();
@@ -48,8 +63,11 @@ export default function defineRoutes(db: V1DB, auth: express.RequestHandler): ex
     })
   );
 
+  router.options("/", cors(corsOptions));
   router.get(
     "/",
+    cors(corsOptions),
+    auth,
     asyncify(async (req, res) => {
       const { query } = req;
 
@@ -79,7 +97,9 @@ export default function defineRoutes(db: V1DB, auth: express.RequestHandler): ex
       const { marketing, email, source } = body;
 
       if (!isEmail(email)) {
-        return res.status(Status.BAD_REQUEST).send({ message: "Invalid Email" });
+        return res
+          .status(Status.BAD_REQUEST)
+          .send({ message: "Invalid Email" });
       }
 
       const user = await userdb.getUser(body.email);
@@ -95,7 +115,9 @@ export default function defineRoutes(db: V1DB, auth: express.RequestHandler): ex
 
         return res.status(Status.OK).send(created.toJSON());
       } else {
-        return res.status(Status.BAD_REQUEST).send({ message: "User already exists." });
+        return res
+          .status(Status.BAD_REQUEST)
+          .send({ message: "User already exists." });
       }
     })
   );
