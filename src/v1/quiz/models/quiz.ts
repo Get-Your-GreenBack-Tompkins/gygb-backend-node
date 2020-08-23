@@ -69,6 +69,10 @@ export function isQuizDocument(
 }
 
 export function isQuizEdit(data: unknown): data is QuizJson {
+  if (data === null || typeof data !== "object") {
+    return false;
+  }
+
   const asEdit = data as QuizJson;
 
   return (

@@ -41,6 +41,10 @@ export function isTutorialDocument(doc: unknown): doc is TutorialDoc {
 }
 
 export function isTutorialEdit(data: unknown): data is TutorialEdit {
+  if (data === null || typeof data !== "object") {
+    return false;
+  }
+
   const asEdit = data as TutorialEdit;
   return typeof asEdit.body === "string" && typeof asEdit.header === "string";
 }

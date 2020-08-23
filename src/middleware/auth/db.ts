@@ -15,8 +15,6 @@ export class AuthDB {
 
       await this._auth.setCustomUserClaims(record.uid, { admin: true });
     } catch (err) {
-      console.error(err);
-
       throw ApiError.notFound("No user was found under that email.");
     }
   }

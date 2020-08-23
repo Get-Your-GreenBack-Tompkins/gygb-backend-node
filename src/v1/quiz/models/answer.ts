@@ -16,6 +16,10 @@ export type AnswerEdit = {
 };
 
 export function isAnswerEdit(data: unknown) {
+  if (data === null || typeof data !== "object") {
+    return false;
+  }
+
   const asEdit = data as AnswerEdit;
   return (
     typeof asEdit.id === "number" &&
@@ -26,7 +30,7 @@ export function isAnswerEdit(data: unknown) {
 }
 
 export function isAnswer(data: unknown) {
-  if (typeof data !== "object") {
+  if (data === null || typeof data !== "object") {
     return false;
   }
 
