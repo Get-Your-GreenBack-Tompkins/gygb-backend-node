@@ -221,9 +221,9 @@ export class Quiz extends Model {
       id,
       name,
       questionCount,
-      questions: questions.sort((a, b) => a.creationTime - b.creationTime),
-      tutorial,
-      defaultRaffle
+      questions: questions.sort((a, b) => a.creationTime - b.creationTime).map(q => q.toJSON()),
+      tutorial: tutorial.toJSON(),
+      defaultRaffle: defaultRaffle.toJSON()
     };
   }
 

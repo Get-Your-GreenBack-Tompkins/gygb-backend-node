@@ -143,7 +143,7 @@ export class Question extends Model {
       id,
       body: body.toJSON(),
       header,
-      answers,
+      answers: answers.map(a => a.toJSON()),
       answerId
     };
   }

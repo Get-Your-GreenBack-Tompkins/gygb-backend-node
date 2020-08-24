@@ -1,4 +1,5 @@
 import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
+import { Jsonable } from "../../model";
 
 export type AnswerId = string;
 export type AnswerDoc = {
@@ -46,7 +47,7 @@ export function isAnswerDocument(
   return data.text && isRichTextData(data.text);
 }
 
-export class Answer {
+export class Answer implements Jsonable {
   id: number;
   text: RichText;
   correct: boolean;

@@ -1,6 +1,7 @@
-import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
-
 import Delta from "quill-delta";
+
+import { RichText, RichTextData, isRichTextData } from "../../models/richtext";
+import { Jsonable } from "../../model";
 
 export function header() {
   const delta = new Delta();
@@ -49,7 +50,7 @@ export function isTutorialEdit(data: unknown): data is TutorialEdit {
   return typeof asEdit.body === "string" && typeof asEdit.header === "string";
 }
 
-export class Tutorial {
+export class Tutorial implements Jsonable {
   header: string;
   body: RichText;
 
@@ -93,7 +94,7 @@ export class Tutorial {
     const { body, header } = this;
 
     return {
-      body,
+      body: body.toJSON(),
       header
     };
   }
