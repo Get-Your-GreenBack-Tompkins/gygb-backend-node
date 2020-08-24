@@ -51,7 +51,7 @@ export default async function defineRoutes(
           const json = quiz.toJSON();
           res.status(Status.OK).json({
             ...json,
-            tutorial: json.tutorial.toDatastore()
+            tutorial: quiz.tutorial.toDatastore()
           });
         } else {
           res
