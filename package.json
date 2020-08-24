@@ -14,7 +14,8 @@
     "test:quiet": "jest --detectOpenHandles --coverage",
     "test:nocov": "jest --detectOpenHandles --verbose",
     "lint": "tsc --noEmit && eslint \"src/**/*.ts\" --quiet --fix",
-    "debug": "node --inspect dist/app.js"
+    "debug": "node --inspect dist/app.js",
+    "heroku-prebuild": "cp sample.npmrc .npmrc && sed -i \"s/<YOUR_AUTH_TOKEN>/${NPM_TOKEN}/g\" .npmrc"
   },
   "resolutions": {
     "@firebase/app-types": "^0.6.1",
