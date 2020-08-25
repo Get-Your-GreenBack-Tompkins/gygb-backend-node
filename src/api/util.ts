@@ -13,6 +13,14 @@ export class ApiError extends Error {
     this.error = error;
   }
 
+  static serviceUnavailable(message: string = "Service Unavailble") {
+    return new ApiError(message, Status.SERVICE_UNAVAILABLE);
+  }
+
+  static requestTimeout(message: string = "Request Timeout") {
+    return new ApiError(message, Status.REQUEST_TIMEOUT);
+  }
+
   // 404 Not Found
   static notFound(message: string) {
     return new ApiError(message, Status.NOT_FOUND);
