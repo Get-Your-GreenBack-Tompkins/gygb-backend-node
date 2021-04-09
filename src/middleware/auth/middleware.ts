@@ -23,7 +23,9 @@ export function initializeAuth(auth: auth.Auth) {
     const [, idToken] = parts;
 
     auth
-      .verifyIdToken(idToken, true)
+      .verifyIdToken(idToken) 
+      // Only confirm that a token hasn't been revoked _after_ we are sure it is a valid token. 
+      .then(() => auth.verifyIdToken(idToken, true))
       .then(claims => {
         return claims.admin === true;
       })

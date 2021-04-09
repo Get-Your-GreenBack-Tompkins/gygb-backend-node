@@ -57,9 +57,15 @@ export default async function defineRoutes(
 
   router.get(
     "/",
-    asyncify(async (_, res) => {
-      const quizToS = await tosdb.getToS("quiz");
-      const hotshotToS = await tosdb.getToS("hotshot");
+    asyncify(async (req, res) => {
+      const [quizToS, hotshotToS] = await Promise.all([
+        tosdb.getToS("quiz"),
+        tosdb.getToS("hotshot")
+      ]);
+
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
 
       res.status(Status.OK).send({
         quiz: quizToS,
@@ -76,7 +82,12 @@ export default async function defineRoutes(
       if (tosId !== "hotshot" && tosId !== "quiz") {
         throw ApiError.invalidRequest("Invalid ToS ID.");
       }
+
       const tos = await tosdb.getToS(tosId);
+
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
 
       res.status(Status.OK).send(tos);
     })

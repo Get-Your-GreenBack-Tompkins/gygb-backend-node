@@ -77,6 +77,10 @@ export default async function defineRoutes(
         // TODO Remove
         console.log(`Updated quiz ${nanoseconds} nanoseconds!`);
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         res.status(Status.OK).send({ nanoseconds });
       })
     );
@@ -91,6 +95,10 @@ export default async function defineRoutes(
         }
 
         const id = await quizdb.newRaffle(prize, questionRequirement);
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         res.status(Status.OK).send({ id });
       })
@@ -118,6 +126,10 @@ export default async function defineRoutes(
 
         const entrants = await quizdb.getRaffleEntrants();
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         if (entrants.length === 0) {
           throw ApiError.internalError("Not enough entrants to find a winner!");
         }
@@ -130,9 +142,17 @@ export default async function defineRoutes(
             : await secureRandomNumber(0, numOfEntrants - 1);
         const winner = entrants[winnerIndex];
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         await quizdb.setRaffleWinner(winner);
 
         const { firstName, lastName, email } = winner;
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         res.status(Status.OK).send({
           firstName,
@@ -144,8 +164,12 @@ export default async function defineRoutes(
 
     authenticated.get(
       "/web-client/raffle/edit",
-      asyncify(async (_, res) => {
+      asyncify(async (req, res) => {
         const raffle = await quizdb.getCurrentRaffle(false);
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         res.status(Status.OK).send(raffle.toJSON());
       })
@@ -161,6 +185,10 @@ export default async function defineRoutes(
           prize
         });
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         res.status(Status.OK).send({ message: "Edited." });
       })
     );
@@ -172,6 +200,10 @@ export default async function defineRoutes(
 
         await quizdb.deleteQuestion(questionId);
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         res.status(Status.OK).send({ message: "Deleted." });
       })
     );
@@ -180,6 +212,10 @@ export default async function defineRoutes(
       "/web-client/question/",
       asyncify(async (req, res) => {
         await quizdb.addQuestion();
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         res.status(Status.CREATED).send({ message: "Added." });
       })
@@ -192,6 +228,10 @@ export default async function defineRoutes(
         const { questionId } = req.params;
 
         await quizdb.addAnswer(questionId);
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         res.status(Status.CREATED).send({ message: "Added." });
       })
@@ -212,6 +252,10 @@ export default async function defineRoutes(
 
         await quizdb.deleteAnswer(questionId, id);
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         res.status(Status.OK).send({ message: "Deleted." });
       })
     );
@@ -222,6 +266,10 @@ export default async function defineRoutes(
         const { questionId } = req.params;
 
         const question = await quizdb.getQuestion(questionId);
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         if (question) {
           res.json(question.toDatastore());
@@ -250,6 +298,10 @@ export default async function defineRoutes(
 
         const nanoseconds = await quizdb.updateQuestion(newQuestion);
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         // TODO Remove
         console.log(`Updated in ${nanoseconds} nanoseconds!`);
 
@@ -266,9 +318,9 @@ export default async function defineRoutes(
 
     unauthenticated.get(
       "/web-client/tutorial",
-      asyncify(async (_, res) => {
-        const tutorial = await quizdb.getTutorial();
-        const quiz = await quizdb.getQuiz();
+      (_, res) => {
+        const tutorial = quizdb.getTutorial();
+        const quiz = quizdb.getQuiz();
         const numOfQuestions = Math.min(
           quiz.questionCount,
           quiz.questions.length
@@ -278,7 +330,7 @@ export default async function defineRoutes(
           ...tutorial,
           totalQuestions: numOfQuestions
         });
-      })
+      }
     );
 
     unauthenticated.get(
@@ -286,11 +338,15 @@ export default async function defineRoutes(
       asyncify(async (req, res) => {
         const raffle = await quizdb.getCurrentRaffle();
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         if (raffle == null) {
           return res.status(Status.NOT_FOUND).send(null);
         }
 
-        const quiz = await quizdb.getQuiz();
+        const quiz = quizdb.getQuiz();
 
         const numberOfQuestions = Math.min(
           quiz.questionCount,
@@ -328,6 +384,10 @@ export default async function defineRoutes(
 
         const percentage = stats.correct / stats.total;
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         const raffle = await quizdb.getCurrentRaffle();
 
         if (raffle == null) {
@@ -335,6 +395,10 @@ export default async function defineRoutes(
         }
 
         const percentageRequired = raffle.requirement;
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         if (percentage > percentageRequired) {
           await quizdb.addToRaffle({
@@ -372,6 +436,10 @@ export default async function defineRoutes(
 
         const answer = await quizdb.getAnswer(questionId, id);
 
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
+
         if (answer) {
           const { correct, message } = answer;
 
@@ -397,6 +465,10 @@ export default async function defineRoutes(
         }
 
         const stats = await quizdb.correctAnswers(answers);
+
+        if (req.timedOut || res.timedOut) {
+          return;
+        }
 
         res.status(Status.OK).send({
           ...stats

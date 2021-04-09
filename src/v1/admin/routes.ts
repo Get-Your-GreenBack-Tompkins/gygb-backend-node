@@ -26,8 +26,12 @@ export default async function defineRoutes(auth: auth.Auth, middleware: express.
 
   router.get(
     "/list",
-    asyncify(async (_, res) => {
+    asyncify(async (req, res) => {
       const admins = await authdb.getAdmins();
+
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
 
       res.status(Status.OK).send({ admins });
     })
@@ -44,6 +48,10 @@ export default async function defineRoutes(auth: auth.Auth, middleware: express.
 
       await authdb.addAdmin(query.email);
 
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
+
       res.status(Status.OK).send({ message: "Success." });
     })
   );
@@ -58,6 +66,10 @@ export default async function defineRoutes(auth: auth.Auth, middleware: express.
       }
 
       await authdb.removeAdmin(query.email);
+
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
 
       res.status(Status.OK).send({ message: "Success." });
     })

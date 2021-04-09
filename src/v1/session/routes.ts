@@ -19,6 +19,10 @@ export default function defineRoutes(db: V1DB, auth: express.RequestHandler): ex
 
       const created = await sessiondb.createSession({ ...body, startTime: new Date(body.startTime) });
 
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
+
       if (created) {
         res.status(Status.OK).send(created.id);
       } else {
@@ -33,6 +37,10 @@ export default function defineRoutes(db: V1DB, auth: express.RequestHandler): ex
       const { body } = req;
 
       const updated = await sessiondb.updateSession({ ...body, endTime: new Date(body.endTime) });
+
+      if (req.timedOut || res.timedOut) {
+        return;
+      }
 
       if (updated) {
         res.send(Status.OK);

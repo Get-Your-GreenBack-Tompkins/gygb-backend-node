@@ -8,16 +8,23 @@ import { Quiz, isQuizDocument } from "./models/quiz";
 import { Answer } from "./models/answer";
 import { isQuestionDocument, Question } from "./models/question";
 import { RichText } from "../models/richtext";
-import { Raffle, isRaffleQueryDocument, RaffleDoc, isRaffleDocument, RaffleEntrant } from "./models/raffle";
+import {
+  Raffle,
+  isRaffleQueryDocument,
+  RaffleDoc,
+  isRaffleDocument,
+  RaffleEntrant
+} from "./models/raffle";
 import { Tutorial } from "./models/tutorial";
+import { firestore } from "firebase-admin";
 
 export enum QuizCollection {
   QUESTIONS = "questions",
-  RAFFLES = "raffles",
+  RAFFLES = "raffles"
 }
 
 export enum QuizRaffleCollection {
-  SUBSCRIBERS = "subscribers",
+  SUBSCRIBERS = "subscribers"
 }
 
 export class QuizError {
@@ -39,13 +46,17 @@ export async function queryQuiz(quizId: string, db: V1DB): Promise<Quiz> {
   const quizDoc = await db.quiz().doc(quizId);
 
   const quizData = await quizDoc.get();
-  const questionCollection = await quizDoc.collection(QuizCollection.QUESTIONS).listDocuments();
+  const questionCollection = await quizDoc
+    .collection(QuizCollection.QUESTIONS)
+    .listDocuments();
 
-  const unresolvedQuestions = questionCollection.map(async (d) => {
+  const unresolvedQuestions = questionCollection.map(async d => {
     const questionDoc = await d.get();
 
     if (!isQuestionDocument(questionDoc)) {
-      throw ApiError.internalError(`Invalid question document ${d.id} in quiz ${quizId}`);
+      throw ApiError.internalError(
+        `Invalid question document ${d.id} in quiz ${quizId}`
+      );
     }
 
     const question = Question.fromDatastore(questionDoc.id, questionDoc.data());
@@ -69,29 +80,108 @@ export async function queryQuiz(quizId: string, db: V1DB): Promise<Quiz> {
 
 type Subscription = (() => void) | null;
 
+const MAX_ATTEMPTED_CONNECTIONS = 3;
+
 export class QuizDB extends MigratableDB {
 
   private quizId: string;
   private quiz: Quiz;
+  private subscriptions: Map<string, Subscription>;
 
   constructor(db: V1DB, quizId: string) {
     super(db);
 
     this.quizId = quizId;
+    this.subscriptions = new Map();
   }
 
   protected async migrateHook(versionTo: number): Promise<void> {
     const { quizId } = this;
     switch (versionTo) {
       case 2:
-          await this.db.quiz().doc(quizId).update({
-             defaultRaffle: {
-               prize: "Default Prize",
-               requirement: 0.6
-             }
+        await this.db
+          .quiz()
+          .doc(quizId)
+          .update({
+            defaultRaffle: {
+              prize: "Default Prize",
+              requirement: 0.6
+            }
           });
         break;
     }
+  }
+
+
+  protected _listen<
+    F,
+    T extends () => {
+      path: string;
+      onSnapshot(
+        onUpdate: (ref: F) => void,
+        onError: (error: Error) => void
+      ): () => void;
+    }
+  >(ref: T, update: (obj: F) => void, connectionAttempts = 0) {
+    const obj = ref();
+    const path = obj.path;
+
+    const cancel = () => {
+      const currentSubscription = this.subscriptions.get(path);
+
+      if (currentSubscription) {
+        // Cancel the current subscription.
+        this.subscriptions.set(path, null);
+
+        currentSubscription();
+      }
+    };
+
+    cancel();
+
+    // Listen for question changes.
+    const subscription = obj.onSnapshot(
+      obj => {
+        update(obj);
+      },
+      error => {
+        console.error(error);
+
+        console.log(`Restarting ${path} listeners...`);
+
+        cancel();
+
+        if (connectionAttempts > MAX_ATTEMPTED_CONNECTIONS) {
+          console.error(
+            "Failed to re-establish connection to Firestore database, " +
+              "backend will continue serving through cache and reconnect " +
+              "when refreshed via the admin panel or within the next " +
+              "24 hours. This is likely the result of a sustained outage " +
+              "on Google Cloud or a networking error within Heroku."
+          );
+        } else {
+          setTimeout(() => {
+            this._listen(ref, update, connectionAttempts + 1);
+          }, 1000 * connectionAttempts);
+        }
+      }
+    );
+
+    this.subscriptions.set(path, subscription);
+  }
+
+  protected _listenForDoc(
+    docRef: () => firestore.DocumentReference,
+    update: (doc: firestore.DocumentSnapshot) => void
+  ) {
+    this._listen(docRef, update);
+  }
+
+  protected _listenForCollection(
+    collectionRef: () => firestore.CollectionReference,
+    update: () => void
+  ) {
+    this._listen(collectionRef, update);
   }
 
   async getQuizNoCache(): Promise<Quiz> {
@@ -103,8 +193,8 @@ export class QuizDB extends MigratableDB {
     return this.quiz;
   }
 
-  async getTutorial(): Promise<Tutorial> {
-    const quiz = await this.getQuiz();
+  getTutorial(): Tutorial {
+    const quiz = this.getQuiz();
 
     return quiz.tutorial;
   }
@@ -118,69 +208,36 @@ export class QuizDB extends MigratableDB {
     this.quiz = quiz;
   }
 
-  _questionsSubscription: Subscription = null;
-
   _questionListen() {
     const { quizId, db } = this;
-    if (this._questionsSubscription) {
-      this._questionsSubscription();
-      this._questionsSubscription = null;
-    }
 
-    // Listen for question changes.
-    this._questionsSubscription = this.db
-      .quiz()
-      .doc(quizId)
-      .collection(QuizCollection.QUESTIONS)
-      .onSnapshot(
-        () => {
-          queryQuiz(quizId, db)
-            .then((quiz) => {
-              console.log(`Updating quiz: ${quizId}`);
-              this.quiz = quiz;
-            })
-            .catch((err) => console.log(err));
-        },
-        (error) => {
-          console.error(error);
-
-          console.log("Restarting question listeners...");
-          this._questionsSubscription = null;
-          this._questionListen();
-        }
-      );
+    this._listenForCollection(
+      () => this.db.quiz().doc(quizId).collection(QuizCollection.QUESTIONS),
+      () => {
+        queryQuiz(quizId, db)
+          .then(quiz => {
+            console.log(`Updating questions: ${quizId}`);
+            this.quiz = quiz;
+          })
+          .catch(err => console.log(err));
+      }
+    );
   }
-
-  _quizSubscription: Subscription = null;
 
   _quizListen() {
     const { quizId, db } = this;
-    if (this._quizSubscription) {
-      this._quizSubscription();
-      this._quizSubscription = null;
-    }
 
-    // Listen for quiz changes.
-    this._quizSubscription = this.db
-      .quiz()
-      .doc(quizId)
-      .onSnapshot(
-        (doc) => {
-          queryQuiz(doc.id, db)
-            .then((quiz) => {
-              console.log(`Updating quiz: ${quizId}`);
-              this.quiz = quiz;
-            })
-            .catch((err) => console.log(err));
-        },
-        (error) => {
-          console.error(error);
-
-          console.log("Restarting quiz listeners...");
-          this._quizSubscription = null;
-          this._quizListen();
-        }
-      );
+    this._listenForDoc(
+      () => this.db.quiz().doc(quizId),
+      doc => {
+        queryQuiz(doc.id, db)
+          .then(quiz => {
+            console.log(`Updating quiz: ${quizId}`);
+            this.quiz = quiz;
+          })
+          .catch(err => console.log(err));
+      }
+    );
   }
 
   _raffle: Raffle | null = null;
@@ -188,7 +245,10 @@ export class QuizDB extends MigratableDB {
   _raffleMonth = -1;
   _raffleYear = -1;
 
-  async getCurrentRaffle(cache: boolean = true, generate: boolean = true): Promise<Raffle> {
+  async getCurrentRaffle(
+    cache: boolean = true,
+    generate: boolean = true
+  ): Promise<Raffle> {
     const { quizId } = this;
 
     const currentDate = new Date();
@@ -204,7 +264,10 @@ export class QuizDB extends MigratableDB {
     endDate.setUTCFullYear(currentYear, currentMonth + 1, 1);
     endDate.setUTCHours(23, 59, 59, 0);
 
-    if (currentMonth !== this._raffleMonth || currentYear !== this._raffleYear) {
+    if (
+      currentMonth !== this._raffleMonth ||
+      currentYear !== this._raffleYear
+    ) {
       if (this._raffleSubscription) {
         this._raffleSubscription();
       }
@@ -226,14 +289,21 @@ export class QuizDB extends MigratableDB {
 
     if (potentialRaffles.size == 0) {
       if (generate) {
-        console.log("No raffle found, attempting to generate the raffle automatically...");
+        console.log(
+          "No raffle found, attempting to generate the raffle automatically..."
+        );
 
         if (!this.quiz.defaultRaffle) {
-          throw new Error("No default raffle options exist! You must manually create the raffle.");
+          throw new Error(
+            "No default raffle options exist! You must manually create the raffle."
+          );
         }
 
-        const id = await this.newRaffle(this.quiz.defaultRaffle.prize, this.quiz.defaultRaffle.requirement);
-        console.log("id: ", id);
+        await this.newRaffle(
+          this.quiz.defaultRaffle.prize,
+          this.quiz.defaultRaffle.requirement
+        );
+
         return await this.getCurrentRaffle(false, false);
       }
 
@@ -241,7 +311,9 @@ export class QuizDB extends MigratableDB {
     }
 
     if (potentialRaffles.size > 1) {
-      throw new Error("Somehow we have multiple raffles in a single month. This should not occur.");
+      throw new Error(
+        "Somehow we have multiple raffles in a single month. This should not occur."
+      );
     }
 
     const [raffleDoc] = potentialRaffles.docs;
@@ -268,14 +340,16 @@ export class QuizDB extends MigratableDB {
       .where("month", ">=", startDate)
       .where("month", "<", endDate)
       .onSnapshot(
-        (potentialRaffles) => {
+        potentialRaffles => {
           if (potentialRaffles.size == 0) {
             this._raffle = null;
             return;
           }
 
           if (potentialRaffles.size > 1) {
-            throw new Error("Somehow we have multiple raffles in a single month. This should not occur.");
+            throw new Error(
+              "Somehow we have multiple raffles in a single month. This should not occur."
+            );
           }
 
           const [raffleDoc] = potentialRaffles.docs;
@@ -288,7 +362,7 @@ export class QuizDB extends MigratableDB {
 
           this._raffle = raffle;
         },
-        (error) => console.error(error)
+        error => console.error(error)
       );
 
     this._raffle = raffle;
@@ -301,9 +375,15 @@ export class QuizDB extends MigratableDB {
   async getRafflesNoCache() {
     const { quizId } = this;
 
-    const raffleDocs = await this.db.quiz().doc(quizId).collection(QuizCollection.RAFFLES).listDocuments();
+    const raffleDocs = await this.db
+      .quiz()
+      .doc(quizId)
+      .collection(QuizCollection.RAFFLES)
+      .listDocuments();
 
-    const rawRaffles = await Promise.all(raffleDocs.map(async (r) => [r.id, await r.get()] as const));
+    const rawRaffles = await Promise.all(
+      raffleDocs.map(async r => [r.id, await r.get()] as const)
+    );
 
     const raffles = rawRaffles
       .filter(
@@ -321,7 +401,7 @@ export class QuizDB extends MigratableDB {
     raffleId,
     firstName,
     lastName,
-    email,
+    email
   }: {
     raffleId: string;
     firstName: string;
@@ -336,17 +416,20 @@ export class QuizDB extends MigratableDB {
       .doc(raffleId)
       .collection(QuizRaffleCollection.SUBSCRIBERS);
 
-    const num = (await subscribers.where("email", "==", email.trim()).get()).size;
+    const num = (await subscribers.where("email", "==", email.trim()).get())
+      .size;
 
     if (num !== 0) {
-      throw ApiError.invalidRequest(`Email ${email} already is subscribed to the raffle.`);
+      throw ApiError.invalidRequest(
+        `Email ${email} already is subscribed to the raffle.`
+      );
     }
 
     return (
       await subscribers.add({
         firstName,
         lastName,
-        email,
+        email
       })
     ).id;
   }
@@ -367,9 +450,18 @@ export class QuizDB extends MigratableDB {
     startDate.setUTCFullYear(currentYear, currentMonth, 1);
     startDate.setUTCHours(0, 0, 0, 0);
 
-    const raffleDoc = this.db.quiz().doc(quizId).collection(QuizCollection.RAFFLES).doc();
+    const raffleDoc = this.db
+      .quiz()
+      .doc(quizId)
+      .collection(QuizCollection.RAFFLES)
+      .doc();
 
-    const raffle = new Raffle({ id: raffleDoc.id, prize, requirement, month: startDate });
+    const raffle = new Raffle({
+      id: raffleDoc.id,
+      prize,
+      requirement,
+      month: startDate
+    });
 
     await raffleDoc.set(raffle.toDatastore());
 
@@ -386,7 +478,7 @@ export class QuizDB extends MigratableDB {
       .doc(raffle.id)
       .set(
         {
-          ...raffleEdit,
+          ...raffleEdit
         },
         { mergeFields: ["requirement", "prize"] }
       );
@@ -395,24 +487,28 @@ export class QuizDB extends MigratableDB {
   async setRaffleWinner(entrant: RaffleEntrant) {
     const { quizId } = this;
     const raffle = await this.getCurrentRaffle(false, false);
-    const raffleDoc = await this.db.quiz().doc(quizId).collection(QuizCollection.RAFFLES).doc(raffle.id);
+    const raffleDoc = await this.db
+      .quiz()
+      .doc(quizId)
+      .collection(QuizCollection.RAFFLES)
+      .doc(raffle.id);
 
     await raffleDoc
       .collection(QuizRaffleCollection.SUBSCRIBERS)
       .doc(entrant.id)
       .set(
         {
-          winner: true,
+          winner: true
         },
         { mergeFields: ["winner"] }
       );
 
     await raffleDoc.set(
       {
-        winner: entrant,
+        winner: entrant
       },
       {
-        mergeFields: ["winner"],
+        mergeFields: ["winner"]
       }
     );
   }
@@ -429,12 +525,12 @@ export class QuizDB extends MigratableDB {
       .get();
 
     const entrants = query.docs
-      .map((d) => [d.id, d.data()] as const)
+      .map(d => [d.id, d.data()] as const)
       .map(([id, { firstName, lastName, email }]) => ({
         id,
         firstName: firstName as string,
         lastName: lastName as string,
-        email: email as string,
+        email: email as string
       }));
 
     return entrants;
@@ -445,14 +541,21 @@ export class QuizDB extends MigratableDB {
 
     const quizDoc = await this.db.quiz().doc(quizId);
 
-    const questionDoc = quizDoc.collection(QuizCollection.QUESTIONS).doc(questionId);
+    const questionDoc = quizDoc
+      .collection(QuizCollection.QUESTIONS)
+      .doc(questionId);
     const questionData = await questionDoc.get();
 
     if (!isQuestionDocument(questionData)) {
-      throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
+      throw ApiError.internalError(
+        `Invalid question (${questionId}) in quiz (${quizId})!`
+      );
     }
 
-    const question = Question.fromDatastore(questionData.id, questionData.data());
+    const question = Question.fromDatastore(
+      questionData.id,
+      questionData.data()
+    );
 
     return question;
   }
@@ -500,7 +603,7 @@ export class QuizDB extends MigratableDB {
     total: number;
   }> {
     const correct = await Promise.all(
-      Object.keys(answers).map(async (questionId) => {
+      Object.keys(answers).map(async questionId => {
         return this.getAnswer(questionId, answers[questionId]);
       })
     );
@@ -518,22 +621,27 @@ export class QuizDB extends MigratableDB {
       {
         correct: 0,
         incorrect: 0,
-        total: correct.length,
+        total: correct.length
       }
     );
 
     return stats;
   }
 
-  async getAnswer(questionId: string, answerId: number): Promise<Answer | null> {
+  async getAnswer(
+    questionId: string,
+    answerId: number
+  ): Promise<Answer | null> {
     const { quizId } = this;
     const question = await this.getQuestion(questionId);
 
     if (!question) {
-      throw ApiError.notFound(`No question found for ID ${questionId} in Quiz ${quizId}`);
+      throw ApiError.notFound(
+        `No question found for ID ${questionId} in Quiz ${quizId}`
+      );
     }
 
-    const answer = question.answers.find((a) => a.id === answerId);
+    const answer = question.answers.find(a => a.id === answerId);
 
     return answer || null;
   }
@@ -541,12 +649,16 @@ export class QuizDB extends MigratableDB {
   async addAnswer(questionId: string): Promise<number> {
     const { quizId } = this;
     const quizDoc = await this.db.quiz().doc(quizId);
-    const result = await quizDoc.collection(QuizCollection.QUESTIONS).doc(questionId);
+    const result = await quizDoc
+      .collection(QuizCollection.QUESTIONS)
+      .doc(questionId);
 
     const doc = await result.get();
 
     if (!doc.exists || !isQuestionDocument(doc)) {
-      throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
+      throw ApiError.internalError(
+        `Invalid question (${questionId}) in quiz (${quizId})!`
+      );
     }
 
     const question = Question.fromDatastore(result.id, doc.data());
@@ -570,16 +682,20 @@ export class QuizDB extends MigratableDB {
     const { quizId } = this;
 
     const quizDoc = await this.db.quiz().doc(quizId);
-    const result = await quizDoc.collection(QuizCollection.QUESTIONS).doc(questionId);
+    const result = await quizDoc
+      .collection(QuizCollection.QUESTIONS)
+      .doc(questionId);
     const doc = await result.get();
 
     if (!doc.exists || !isQuestionDocument(doc)) {
-      throw ApiError.internalError(`Invalid question (${questionId}) in quiz (${quizId})!`);
+      throw ApiError.internalError(
+        `Invalid question (${questionId}) in quiz (${quizId})!`
+      );
     }
 
     const question = Question.fromDatastore(result.id, doc.data());
 
-    const answerIndex = question.answers.findIndex((a) => a.id === answerId);
+    const answerIndex = question.answers.findIndex(a => a.id === answerId);
 
     if (answerIndex === -1) {
       throw ApiError.notFound(
@@ -599,16 +715,20 @@ export class QuizDB extends MigratableDB {
     const { header, body, answers } = question.toDatastore();
     const update = { header, body, answers };
 
-    const result = await quizDoc.collection(QuizCollection.QUESTIONS).doc(question.id);
+    const result = await quizDoc
+      .collection(QuizCollection.QUESTIONS)
+      .doc(question.id);
 
     if ((await result.get()).exists) {
       const metrics = await result.set(update, {
-        mergeFields: ["body", "header", "answers"],
+        mergeFields: ["body", "header", "answers"]
       });
       return metrics.writeTime.nanoseconds;
     }
 
-    throw ApiError.invalidRequest(`${question.id} is not a valid question in ${quizId}!`);
+    throw ApiError.invalidRequest(
+      `${question.id} is not a valid question in ${quizId}!`
+    );
   }
 
   async updateQuiz(quiz: Quiz): Promise<number> {
@@ -619,7 +739,7 @@ export class QuizDB extends MigratableDB {
     const update = { name, questionCount, tutorial, defaultRaffle };
 
     const result = await quizDoc.set(update, {
-      mergeFields: ["name", "questionCount", "tutorial", "defaultRaffle"],
+      mergeFields: ["name", "questionCount", "tutorial", "defaultRaffle"]
     });
 
     return result.writeTime.nanoseconds;
